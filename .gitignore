@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# bun
+bun.lockb.bak
+
+# next.js
+.next/
+out/
+build/
+dist/
+
+# embedded postgres (pglite) data
+.pglite/
+*.pglite
+
+# env / secrets
+.env
+.env.local
+.env*.local
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+
+# personal / interview notes — never share
+*.private.md
