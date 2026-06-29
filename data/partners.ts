@@ -1,0 +1,240 @@
+import type { Partner } from "@/lib/types";
+
+// Seeded local partner graph. In production this layer is hydrated from Google Places;
+// here it's authored behind the same shape (a clean adapter seam). Tuned so the
+// deterministic sub-scores alone produce the demo arc — the LLM evidence-read then
+// adds nuance on top. Coordinates are around Plano / Frisco / Allen, TX.
+export const PARTNERS: Partner[] = [
+  // --- restoration partners (for plumbing → restoration referrals) ---
+  {
+    id: "p_rainbow_plano",
+    name: "Rainbow Restoration of Plano",
+    brandId: "rainbow",
+    trade: "restoration",
+    lat: 33.026,
+    lng: -96.705,
+    rating: 4.8,
+    reviewCount: 212,
+    capacityStatus: "open_today",
+    specialties: ["water extraction", "mold remediation", "structural drying", "insurance billing"],
+    capabilitySheet:
+      "24/7 emergency water extraction and structural drying, mold remediation, IICRC-certified technicians, direct insurance billing. Same-day dispatch across Plano.",
+    reviews: [
+      "They had a crew out within two hours when our kitchen flooded.",
+      "Walked us through the insurance claim from start to finish.",
+      "Dried everything out before mold could take hold — spotless work.",
+    ],
+  },
+  {
+    id: "p_servpro_plano",
+    name: "ServPro of West Plano",
+    brandId: null,
+    trade: "restoration",
+    lat: 33.062,
+    lng: -96.742,
+    rating: 4.6,
+    reviewCount: 98,
+    capacityStatus: "this_week",
+    specialties: ["water damage", "mold remediation", "carpet cleaning"],
+    capabilitySheet:
+      "Residential and commercial water and fire restoration, mold remediation, carpet and upholstery cleaning. Scheduling typically within the week.",
+    reviews: [
+      "Solid work, though it took a couple of days to get on the schedule.",
+      "Professional crew, fair price.",
+    ],
+  },
+  {
+    id: "p_pauldavis_plano",
+    name: "Paul Davis Restoration",
+    brandId: null,
+    trade: "restoration",
+    lat: 32.99,
+    lng: -96.62,
+    rating: 4.4,
+    reviewCount: 60,
+    capacityStatus: "this_week",
+    specialties: ["water mitigation", "reconstruction", "contents"],
+    capabilitySheet:
+      "Water mitigation and full reconstruction, contents pack-out and storage. Larger losses a specialty; lead times can run longer.",
+    reviews: ["Handled a big loss for us well.", "Communication could have been better mid-project."],
+  },
+
+  // --- electrical partners (for hvac → electrical referrals) ---
+  {
+    id: "p_mrelectric_plano",
+    name: "Mr. Electric of Plano",
+    brandId: "mr_electric",
+    trade: "electrical",
+    lat: 33.033,
+    lng: -96.706,
+    rating: 4.1,
+    reviewCount: 76,
+    capacityStatus: "open_today",
+    specialties: ["outlets", "lighting", "ev charger", "troubleshooting"],
+    capabilitySheet:
+      "Same-day residential electrical: outlets, lighting, EV chargers, breaker swaps, troubleshooting. In-network Neighborly brand with direct cross-referral handoff.",
+    reviews: [
+      "Showed up the same day and fixed our outlet fast.",
+      "Reliable for small jobs.",
+      "Fine work, but scheduling was a little chaotic.",
+    ],
+  },
+  {
+    id: "p_volt_frisco",
+    name: "Volt Brothers Electric",
+    brandId: null,
+    trade: "electrical",
+    lat: 33.1,
+    lng: -96.74,
+    rating: 4.9,
+    reviewCount: 240,
+    capacityStatus: "this_week",
+    specialties: ["panel upgrade", "service upgrade", "whole-home rewire", "load evaluation", "code compliance"],
+    capabilitySheet:
+      "Master electricians specializing in service-panel upgrades, load evaluations, and whole-home rewires. Meticulous code compliance. Typically books a few days out.",
+    reviews: [
+      "Best electricians we've used — immaculate panel upgrade.",
+      "Higher quality than anyone in the area, worth the short wait.",
+      "Thorough load evaluation, explained everything.",
+    ],
+  },
+  {
+    id: "p_spark_allen",
+    name: "Spark & Sons Electric",
+    brandId: null,
+    trade: "electrical",
+    lat: 33.1,
+    lng: -96.67,
+    rating: 4.7,
+    reviewCount: 130,
+    capacityStatus: "this_week",
+    specialties: ["panel upgrade", "outlets", "lighting"],
+    capabilitySheet:
+      "Family electrical shop: panel upgrades, outlets, lighting, generator hookups. Solid all-rounder, mid-week availability.",
+    reviews: ["Did a clean panel upgrade for us.", "Friendly and on time."],
+  },
+
+  // --- plumbing (e.g. appliance or inspection jobs that surface a plumbing referral) ---
+  {
+    id: "p_mrrooter_plano",
+    name: "Mr. Rooter of Plano",
+    brandId: "mr_rooter",
+    trade: "plumbing",
+    lat: 33.028,
+    lng: -96.702,
+    rating: 4.7,
+    reviewCount: 188,
+    capacityStatus: "open_today",
+    specialties: ["drain cleaning", "leak repair", "water heater", "repipe", "supply line"],
+    capabilitySheet:
+      "Same-day plumbing: drain cleaning, leak detection and repair, water heaters, repipes. In-network Neighborly brand with direct cross-referral handoff.",
+    reviews: ["Fast leak fix under the sink.", "Same-day and upfront pricing."],
+  },
+  {
+    id: "p_benfranklin",
+    name: "Benjamin Franklin Plumbing",
+    brandId: null,
+    trade: "plumbing",
+    lat: 33.07,
+    lng: -96.74,
+    rating: 4.6,
+    reviewCount: 142,
+    capacityStatus: "this_week",
+    specialties: ["water heater", "leak repair", "fixtures"],
+    capabilitySheet: "Residential plumbing, water heaters, leak repair, fixture install. Punctual-guarantee shop.",
+    reviews: ["On time, as promised.", "Solid water-heater swap."],
+  },
+  {
+    id: "p_aceplumb",
+    name: "Ace Plumbing Co",
+    brandId: null,
+    trade: "plumbing",
+    lat: 32.98,
+    lng: -96.63,
+    rating: 4.3,
+    reviewCount: 54,
+    capacityStatus: "this_week",
+    specialties: ["drain cleaning", "sewer", "repipe"],
+    capabilitySheet: "Drains, sewer lines, repipes. Budget-friendly, books a few days out.",
+    reviews: ["Cleared our sewer line well.", "Good value."],
+  },
+
+  // --- hvac (e.g. electrical or inspection jobs that surface an HVAC referral) ---
+  {
+    id: "p_aireserv_plano",
+    name: "Aire Serv of Plano",
+    brandId: "aire_serv",
+    trade: "hvac",
+    lat: 33.031,
+    lng: -96.7,
+    rating: 4.6,
+    reviewCount: 164,
+    capacityStatus: "open_today",
+    specialties: ["ac repair", "furnace", "duct", "thermostat", "tune-up"],
+    capabilitySheet:
+      "Same-day heating and cooling: AC and furnace repair, duct work, thermostats, tune-ups. In-network Neighborly brand.",
+    reviews: ["Got our AC running same day.", "Honest about what needed fixing."],
+  },
+  {
+    id: "p_coolbreeze",
+    name: "Cool Breeze HVAC",
+    brandId: null,
+    trade: "hvac",
+    lat: 33.12,
+    lng: -96.74,
+    rating: 4.8,
+    reviewCount: 221,
+    capacityStatus: "this_week",
+    specialties: ["ac repair", "system replacement", "duct", "high-efficiency"],
+    capabilitySheet:
+      "Top-rated HVAC: system replacements, high-efficiency installs, duct sealing, repairs. Meticulous, books out a few days.",
+    reviews: ["Best HVAC install we've had.", "Worth the short wait."],
+  },
+  {
+    id: "p_climatepro",
+    name: "Climate Pro",
+    brandId: null,
+    trade: "hvac",
+    lat: 33.1,
+    lng: -96.66,
+    rating: 4.4,
+    reviewCount: 88,
+    capacityStatus: "this_week",
+    specialties: ["ac repair", "furnace", "maintenance"],
+    capabilitySheet: "Repairs and maintenance for AC and furnaces. Reliable all-rounder.",
+    reviews: ["Quick AC repair.", "Friendly tech."],
+  },
+
+  // --- dryer vent (e.g. appliance or cleaning jobs that surface a fire-risk vent) ---
+  {
+    id: "p_dryerventwizard",
+    name: "Dryer Vent Wizard of Plano",
+    brandId: "dryer_vent_wizard",
+    trade: "dryer_vent",
+    lat: 33.034,
+    lng: -96.705,
+    rating: 4.7,
+    reviewCount: 96,
+    capacityStatus: "open_today",
+    specialties: ["dryer vent cleaning", "vent repair", "lint removal", "fire-risk inspection"],
+    capabilitySheet:
+      "Dryer-vent cleaning, repair, and rerouting; lint and fire-risk inspections. In-network Neighborly brand, same-day.",
+    reviews: ["Pulled a scary amount of lint out.", "Fast and thorough."],
+  },
+  {
+    id: "p_ventclean",
+    name: "Vent Clean Co",
+    brandId: null,
+    trade: "dryer_vent",
+    lat: 33.09,
+    lng: -96.73,
+    rating: 4.5,
+    reviewCount: 47,
+    capacityStatus: "this_week",
+    specialties: ["dryer vent cleaning", "lint removal"],
+    capabilitySheet: "Dryer-vent and exhaust cleaning. Straightforward, mid-week availability.",
+    reviews: ["Did the job well.", "Reasonable price."],
+  },
+];
+
+export const PARTNER_BY_ID = new Map(PARTNERS.map((p) => [p.id, p]));
