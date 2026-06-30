@@ -1,0 +1,8 @@
+# Relay workspace profile.
+# Edit these values, reload the app, and the sidebar account card + the Settings
+# view update to match.
+profile:
+  name: Jordan Vega
+  org: Neighborly
+  location: Plano, TX
+  initials: JV # shown in the avatar; remove this line to auto-derive from the name
