@@ -2,7 +2,9 @@
 
 > **A cross-trade referral router for the home-services trades.** When a trades pro closes a job, Relay detects an adjacent cross-trade referral opportunity, retrieves the best in-network partner from a federated brand-and-geography graph, puts the routing to a **jury of diverse LLM judges** and measures their agreement, drafts the customer handoff — then auto-routes the confident referrals and escalates the ambiguous ones to a human.
 
-A working prototype of a marketplace **activation** loop: turning every completed job into the *right* cross-trade referral, automatically and safely. (Repo name: `referral-opportunity-engine`.)
+A working prototype of a marketplace **activation** loop: turning every completed job into the *right* cross-trade referral, automatically and safely.
+
+![The Relay console — a live feed of completed jobs, each detected, routed, and priced in real time](docs/assets/hero.png)
 
 ## The problem it targets
 
@@ -17,8 +19,8 @@ You need [**Bun**](https://bun.sh) and **Node ≥ 20**. From a terminal:
 curl -fsSL https://bun.sh/install | bash
 
 # 2 — clone and install dependencies
-git clone <repo-url>
-cd referral-opportunity-engine
+git clone https://github.com/nadirahdurr/relay.git
+cd relay
 bun install
 
 # 3 — start the app
@@ -122,6 +124,8 @@ Five lenses, deliberately spanning **four model families** so their agreement me
 | **The Steward** | defending in-network brand standards & low-risk choices | `gemini-2.5-flash` | Google |
 
 Each lens is an OCEAN / Big-Five prior that derives that judge's criteria weights in code — never role-played in the prompt. Model ids are OpenRouter slugs, overridable via `JUDGE_MODELS`; with no key every judge falls back to its deterministic weights. Their built-in tension is the point: the Matchmaker's "best fit" pulls out-of-network while the Steward defends in-network, and the Closer's "will it convert" trades off against the Operator's "can they deliver" — so when they *do* concur, that agreement is real signal.
+
+![The jury: five model-diverse judges rank the partners independently; Kendall's W measures their agreement against the required-agreement bar](docs/assets/jury.png)
 
 **Agreement is not correctness.** *W* measures whether the judges *concur*, not whether they're *right* — which is exactly why they span different families (to keep errors from lining up) and why the **human gate** stays as the correctness backstop. *W* decides whether to *defer*, not whether the answer is true.
 
