@@ -115,6 +115,8 @@ The five judges run across **different model families** because the diversity is
 
 Five lenses, deliberately spanning **different model families** so their agreement means something (the models are set in `relay.config.yaml`):
 
+![The five judges — dot-matrix persona avatars, one per model family](docs/assets/judges.svg)
+
 | Judge | The lens it argues from |
 |---|---|
 | **The Matchmaker** | the best technical fit for the job, even out-of-network |
@@ -124,8 +126,6 @@ Five lenses, deliberately spanning **different model families** so their agreeme
 | **The Steward** | defending in-network brand standards & low-risk choices |
 
 Each lens is an OCEAN / Big-Five prior that derives that judge's criteria weights in code — never role-played in the prompt. Each judge's specific model is shown live on its card and set in `relay.config.yaml` (swap any of them there and reload); with no key every judge falls back to its deterministic weights. Their built-in tension is the point: the Matchmaker's "best fit" pulls out-of-network while the Steward defends in-network, and the Closer's "will it convert" trades off against the Operator's "can they deliver" — so when they *do* concur, that agreement is real signal.
-
-![The live jury — five model-diverse judges, each a dot-matrix persona, reading the evidence independently before Kendall's W gates the routing](docs/assets/jury.png)
 
 **Agreement is not correctness.** *W* measures whether the judges *concur*, not whether they're *right* — which is exactly why they span different families (to keep errors from lining up) and why the **human gate** stays as the correctness backstop. *W* decides whether to *defer*, not whether the answer is true.
 
