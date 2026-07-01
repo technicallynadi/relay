@@ -27,7 +27,7 @@ const NR = 18;
 const PX = 600;
 const PW = 300;
 const ROW_H = 62;
-const pY = (i: number) => 60 + i * ROW_H;
+const pY = (i: number) => 68 + i * ROW_H; // leaves a clear band for the column header above card 0
 
 // Geography scatter box (lower-left; revealed during a run).
 const GEO = { x: 40, y: 300, w: 372, h: 116, pad: 16 };
@@ -296,10 +296,16 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
                 ? "var(--teal-dim)"
                 : "var(--surface-raised)";
             const cos = Math.cos(p.a);
-            const lx = CX + (R + 20) * cos;
-            const ly = CY + (R + 20) * Math.sin(p.a);
+            const sin = Math.sin(p.a);
+            const lx = CX + (R + 22) * cos;
+            const ly = CY + (R + 22) * sin;
             const anchor = cos > 0.25 ? "start" : cos < -0.25 ? "end" : "middle";
             const dx = anchor === "start" ? 4 : anchor === "end" ? -4 : 0;
+            // A node sitting straight above the hub has its label directly over the circle —
+            // lift the trade name and drop the brand name so neither collides with the node.
+            const straightTop = anchor === "middle" && sin < 0;
+            const tradeY = straightTop ? ly - 11 : ly;
+            const brandY = straightTop ? ly : ly + 11;
             const emphasized = isOrigin || isTarget || isHover;
             return (
               <g
@@ -321,7 +327,7 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
                 />
                 <text
                   x={lx + dx}
-                  y={ly}
+                  y={tradeY}
                   textAnchor={anchor}
                   fontSize="11"
                   fill="var(--text)"
@@ -332,7 +338,7 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
                 {(isOrigin || isTarget || isHover) && brandName(t) && (
                   <text
                     x={lx + dx}
-                    y={ly + 11}
+                    y={brandY}
                     textAnchor={anchor}
                     fontSize="9"
                     fill="var(--muted)"
@@ -567,7 +573,7 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
 
           {/* ---- captions ---- */}
           {tp && partners.length > 0 && (
-            <text x={PX + PW / 2} y={38} textAnchor="middle" fontSize="10" fill="var(--faint)">
+            <text x={PX + PW / 2} y={24} textAnchor="middle" fontSize="10" fill="var(--faint)">
               local partner graph (retrieved)
             </text>
           )}

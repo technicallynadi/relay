@@ -102,7 +102,7 @@ body {
   color: var(--ink);
 }
 
-/* Mono numerals everywhere they matter (δ / ε / scores) */
+/* Mono numerals everywhere they matter (W / agreement / scores) */
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -450,7 +450,7 @@ select {
 
 .kpis {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 13px;
   margin-bottom: 26px;
 }
@@ -623,7 +623,7 @@ select {
 }
 
 /* ----------------------------------------------------------------------------
-   ε knob
+   agreement knob
    ---------------------------------------------------------------------------- */
 
 .agreement-knob {
@@ -882,7 +882,7 @@ textarea.field {
 }
 
 /* ----------------------------------------------------------------------------
-   Live opportunity feed — δ/ε meter, decision CTA, feed controls
+   Live opportunity feed — agreement meter, decision CTA, feed controls
    (ported from the dot-matrix mock; additive)
    ---------------------------------------------------------------------------- */
 
@@ -904,7 +904,7 @@ textarea.field {
   opacity: 0.82;
 }
 
-/* δ/ε meter: a slim track, an accent/amber fill ∝ δ, a red ε marker */
+/* agreement meter: a slim track, an accent/amber fill ∝ W, a required-agreement marker */
 .mini {
   position: relative;
   height: 5px;
@@ -940,7 +940,7 @@ textarea.field {
   transition: left 0.18s ease;
 }
 
-/* δ readout in the card foot */
+/* W readout in the card foot */
 .delta {
   font-size: 12px;
   color: var(--mut);
@@ -1285,7 +1285,7 @@ textarea.field {
 }
 
 /* ----------------------------------------------------------------------------
-   Committee — judge cards + δ/ε meter
+   Committee — judge cards + agreement meter
    ---------------------------------------------------------------------------- */
 
 .judges {
@@ -1502,7 +1502,7 @@ textarea.field {
 }
 
 .meter-marker::after {
-  content: "ε";
+  content: "need";
   position: absolute;
   top: -16px;
   left: 50%;
@@ -2072,5 +2072,108 @@ textarea.field {
   }
   .compose-field {
     display: none;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   Live-feed motion + confirmation toast
+   ---------------------------------------------------------------------------- */
+
+/* new opportunity cards rise in as they arrive on the feed */
+.opp-card {
+  animation: rise-in 0.34s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* the live pipeline stage breathes so the engine visibly works */
+.stage.live {
+  animation: stage-glow 1.7s ease-in-out infinite;
+}
+@keyframes stage-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 176, 74, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(240, 176, 74, 0.16);
+  }
+}
+
+/* concierge-style confirmation after a send/skip resolves a card */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: 460px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--acc);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  animation: toast-in 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* feed pager — a compact page of cards with a "show more" affordance */
+.feed-pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.feed-more,
+.feed-less {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+.feed-more:hover,
+.feed-less:hover {
+  border-color: var(--acc);
+  color: var(--text);
+}
+.feed-more .mono {
+  color: var(--faint);
+  font-size: 11px;
+}
+.feed-more .chev {
+  color: var(--acc);
+  font-size: 13px;
+  animation: nudge-down 1.6s ease-in-out infinite;
+}
+@keyframes nudge-down {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
   }
 }

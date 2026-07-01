@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { Decision, RunEvent } from "@/lib/types";
+import type { Decision, Job, RunEvent } from "@/lib/types";
 import {
   emptyRun,
   reduceEvent,
@@ -30,7 +30,7 @@ import { LocationsPanel } from "./components/LocationsPanel";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 
-const EXPECTED_JUDGES = 3;
+const EXPECTED_JUDGES = 5;
 
 type RunAction =
   | { kind: "reset"; phase: RunState["phase"] }
@@ -90,21 +90,27 @@ export default function Relay() {
   const [adjacency, setAdjacency] = useState<AdjEdge[]>([]);
   // jobId of the card being routed live through the committee (drill-in / send).
   const [routingJobId, setRoutingJobId] = useState<string | null>(null);
-  // jobIds the human gate has sent — flips the card badge to "sent ✓".
-  const [sentJobIds, setSentJobIds] = useState<Set<string>>(() => new Set());
+  // A brief concierge-style confirmation shown after a send/skip resolves a card.
+  const [toast, setToast] = useState<string | null>(null);
   // Live throughput from the feed (cards under the current threshold), drives KpiRow.
   const [boardStats, setBoardStats] = useState<BoardStats>({ detected: 0, auto: 0, escalated: 0 });
   // The delivery seam from POST /api/action — surfaced in the outcome banner.
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   // Set by the board's composer so "+ new scan" can expand + focus it.
   const composeOpenerRef = useRef<(() => void) | null>(null);
-  // The opportunity currently routed live — so the gate's Send can flip its badge.
+  // The opportunity currently routed live — so the gate's action can resolve its card.
   const routedOppRef = useRef<BoardOpportunity | null>(null);
+  // The board registers its feed-refetch here so compose/resolve reflect at once.
+  const feedRefresherRef = useRef<(() => void) | null>(null);
+  // Scroll anchor for the live-engine region, so a starting run pulls itself into view.
+  const pipelineRef = useRef<HTMLDivElement>(null);
 
   // Active workspace view (sidebar nav).
   const [view, setView] = useState("opportunities");
   // Real session metrics for the KPI row: one entry per completed route.
   const [routedRuns, setRoutedRuns] = useState<{ decision: Decision; ms: number }[]>([]);
+  // Cumulative LLM spend this session (from each run's cost event; $0 in deterministic mode).
+  const [sessionCostUsd, setSessionCostUsd] = useState(0);
   const runStartRef = useRef(0);
   const recordedRunRef = useRef(-1);
 
@@ -134,6 +140,20 @@ export default function Relay() {
     if (state.phase !== "running") setRoutingJobId(null);
   }, [state.phase]);
 
+  // When a run kicks off, bring the live engine into view so you watch it work.
+  useEffect(() => {
+    if (state.phase === "running") {
+      pipelineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [state.phase]);
+
+  // Auto-dismiss the confirmation toast.
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
   // Record each completed route exactly once — feeds the live KPI metrics.
   useEffect(() => {
     if (
@@ -145,8 +165,9 @@ export default function Relay() {
       const ms = runStartRef.current > 0 ? performance.now() - runStartRef.current : 0;
       const decision = state.decision;
       setRoutedRuns((prev) => [...prev, { decision, ms }]);
+      setSessionCostUsd((prev) => prev + (state.cost?.usd ?? 0));
     }
-  }, [state.phase, state.decision]);
+  }, [state.phase, state.decision, state.cost]);
 
   const execute = useCallback(async (target: RouteTarget, minAgreement: number) => {
     abortRef.current?.abort();
@@ -189,12 +210,43 @@ export default function Relay() {
     [execute, minAgreement],
   );
 
+  // Composing drops a real card into the live feed (like the worker would), then routes it
+  // live so you watch the engine work — the same path every other card follows.
   const composeBoard = useCallback(
-    (brandId: string, techNotes: string) => {
-      routedOppRef.current = null;
-      void execute({ brandId, techNotes }, minAgreement);
+    async (brandId: string, techNotes: string) => {
+      const brand = brands.find((b) => b.id === brandId);
+      if (!brand) return;
+      const job: Job = {
+        id: `job_compose_${Math.round(performance.now())}`,
+        scenarioKey: "composed",
+        brandId,
+        trade: brand.trade as Job["trade"],
+        location: { label: "Plano, TX", lat: 33.0198, lng: -96.6989 },
+        summary: "Composed completed job",
+        techNotes,
+        neededSpecialties: [],
+      };
+      let opp: BoardOpportunity | null = null;
+      try {
+        const res = await fetch("/api/incoming", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job }),
+        });
+        if (res.ok) {
+          opp = ((await res.json()) as { opportunity?: BoardOpportunity }).opportunity ?? null;
+        }
+      } catch {
+        // fall through — we can still route the composed job live below
+      }
+      feedRefresherRef.current?.(); // surface the new card at the top of the feed at once
+      if (opp) routeBoardOpportunity(opp);
+      else {
+        routedOppRef.current = null;
+        void execute({ brandId, techNotes }, minAgreement);
+      }
     },
-    [execute, minAgreement],
+    [brands, execute, minAgreement, routeBoardOpportunity],
   );
 
   const handleAction = useCallback(
@@ -226,10 +278,24 @@ export default function Relay() {
         outcome = action === "send" ? "accepted" : action === "skip" ? "closed" : "accepted";
       }
       setDelivery(nextDelivery);
-      // A successful Send at the gate flips the routed card's badge to "sent ✓".
-      if (action === "send") {
-        const sent = routedOppRef.current;
-        if (sent) setSentJobIds((prev) => new Set(prev).add(sent.jobId));
+      // Acting on a card (send or skip) resolves it: it leaves the feed and lives in
+      // Activity from here on. Drop it server-side, then refresh so it disappears at once.
+      const resolved = routedOppRef.current;
+      if (resolved && (action === "send" || action === "skip")) {
+        try {
+          await fetch(`/api/incoming?jobId=${encodeURIComponent(resolved.jobId)}`, {
+            method: "DELETE",
+          });
+        } catch {
+          // best-effort — the next poll still won't include a resolved job
+        }
+        feedRefresherRef.current?.();
+        const partner = resolved.partner ?? "the partner";
+        setToast(
+          action === "send"
+            ? `Held a table with ${partner} — the customer's been notified. Moved to Activity.`
+            : "Set aside — logged in Activity.",
+        );
       }
       dispatch({ kind: "human", action, outcome });
       return outcome;
@@ -246,6 +312,10 @@ export default function Relay() {
 
   const registerComposeOpener = useCallback((open: () => void) => {
     composeOpenerRef.current = open;
+  }, []);
+
+  const registerFeedRefresher = useCallback((refresh: () => void) => {
+    feedRefresherRef.current = refresh;
   }, []);
 
   const reachedDetection = state.detection != null;
@@ -301,6 +371,7 @@ export default function Relay() {
             autoCount={boardStats.auto}
             escalatedCount={boardStats.escalated}
             avgSeconds={avgSeconds}
+            costUsd={sessionCostUsd}
           />
 
           {state.error && (
@@ -315,17 +386,22 @@ export default function Relay() {
               minAgreement={minAgreement}
               running={running}
               routingJobId={routingJobId}
-              sentJobIds={sentJobIds}
               onMinAgreement={handleMinAgreement}
               onDrillIn={routeBoardOpportunity}
               onSend={routeBoardOpportunity}
               onCompose={composeBoard}
               onStats={setBoardStats}
               registerComposeOpener={registerComposeOpener}
+              registerFeedRefresher={registerFeedRefresher}
             />
 
             <FederationGraph state={state} brands={brands} adjacency={adjacency} />
 
+            <div
+              ref={pipelineRef}
+              aria-hidden="true"
+              style={{ gridColumn: "1 / -1", height: 0, scrollMarginTop: 80 }}
+            />
             {(running || reachedDetection) && <PipelineStrip state={state} />}
 
             {reachedDetection && <DetectionPanel state={state} />}
@@ -351,17 +427,16 @@ export default function Relay() {
         </>
       )}
 
-      {view === "federated network" && (
-        <div className="grid" style={{ marginTop: 8 }}>
-          <FederationGraph state={state} brands={brands} adjacency={adjacency} />
-          {reachedCommitteePhase && <CandidateSheets state={state} />}
-        </div>
-      )}
-
       {view === "partners" && <PartnersPanel />}
       {view === "locations" && <LocationsPanel />}
       {view === "activity" && <ActivityPanel />}
       {view === "settings" && <SettingsPanel />}
+
+      {toast && (
+        <div className="toast" role="status" onClick={() => setToast(null)}>
+          {toast}
+        </div>
+      )}
     </AppShell>
   );
 }

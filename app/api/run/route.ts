@@ -1,18 +1,18 @@
 import { buildCustomJob } from "@/data/jobs";
-import { runPipeline, runPipelineForJob } from "@/lib/pipeline";
+import { runPipelineForJob } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Streams the pipeline as newline-delimited JSON RunEvents. Accepts a seeded
-// { scenarioKey } or a composed { brandId, techNotes } job.
+// Streams the pipeline as newline-delimited JSON RunEvents for a { brandId, techNotes } job
+// (the board's cards and composed jobs both route through here).
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
   const minAgreement = typeof body.minAgreement === "number" ? body.minAgreement : undefined;
-  const gen =
-    typeof body.brandId === "string" && typeof body.techNotes === "string"
-      ? runPipelineForJob(buildCustomJob(body.brandId, body.techNotes, typeof body.summary === "string" ? body.summary : undefined), { minAgreement })
-      : runPipeline(typeof body.scenarioKey === "string" ? body.scenarioKey : "drain-job", { minAgreement });
+  const brandId = typeof body.brandId === "string" ? body.brandId : "";
+  const techNotes = typeof body.techNotes === "string" ? body.techNotes : "";
+  const summary = typeof body.summary === "string" ? body.summary : undefined;
+  const gen = runPipelineForJob(buildCustomJob(brandId, techNotes, summary), { minAgreement });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

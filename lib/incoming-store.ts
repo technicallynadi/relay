@@ -34,6 +34,16 @@ export function addIncoming(opp: BoardOpportunity): void {
   if (s.length > MAX) s.length = MAX;
 }
 
+// Remove one opportunity from the feed once it's been acted on (sent/skipped) — it lives
+// in the Activity log from that point on, so the feed stays a queue of open items.
+export function resolveIncoming(jobId: string): BoardOpportunity | null {
+  const s = store();
+  const i = s.findIndex((o) => o.jobId === jobId);
+  if (i === -1) return null;
+  const [removed] = s.splice(i, 1);
+  return removed;
+}
+
 export function listIncoming(): BoardOpportunity[] {
   return store();
 }

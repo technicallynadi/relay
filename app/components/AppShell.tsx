@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 // Sidebar nav. Relay is a single-page workspace; each item switches the active view.
-const PRIMARY_NAV = ["opportunities", "federated network", "partners", "activity"];
+const PRIMARY_NAV = ["opportunities", "partners", "activity"];
 const WORKSPACE_NAV = ["locations", "settings"];
 
 interface Profile {
@@ -12,7 +12,7 @@ interface Profile {
   org: string;
   location: string;
 }
-const DEFAULT_PROFILE: Profile = { name: "dana akl", initials: "DA", org: "neighborly", location: "plano" };
+const DEFAULT_PROFILE: Profile = { name: "Jordan Vega", initials: "JV", org: "Neighborly", location: "Plano, TX" };
 
 interface Props {
   /** Page title in the dot-matrix display face, e.g. "OPPORTUNITIES". */

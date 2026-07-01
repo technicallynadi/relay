@@ -4,6 +4,7 @@
 // sequence, so "declines" (ends after detection) and "abstains" (adds a split)
 // fall out naturally.
 
+import type { CostSummary } from "@/lib/cost";
 import type {
   Candidate,
   CommitteeResult,
@@ -54,6 +55,8 @@ export interface RunState {
   // human gate result (client-side, set after POST /api/action)
   humanAction: HumanAction | null;
   outcome: Outcome | null;
+  // LLM cost for this run (null until the cost event arrives; zero in deterministic mode)
+  cost: CostSummary | null;
 }
 
 export function emptyRun(phase: RunPhase = "idle"): RunState {
@@ -77,6 +80,7 @@ export function emptyRun(phase: RunPhase = "idle"): RunState {
     error: null,
     humanAction: null,
     outcome: null,
+    cost: null,
   };
 }
 
@@ -137,6 +141,9 @@ export function reduceEvent(prev: RunState, ev: RunEvent): RunState {
         decision: ev.decision,
       };
     }
+
+    case "cost":
+      return { ...prev, cost: ev.summary };
 
     case "error":
       return { ...prev, phase: "error", error: ev.message };

@@ -7,6 +7,7 @@ import { JOB_BY_SCENARIO } from "@/data/jobs";
 import { JUDGES } from "@/data/judges";
 import { getPartners } from "@/lib/places";
 import { gate, runJudge } from "@/lib/committee";
+import { beginCostCapture, endCostCapture } from "@/lib/cost";
 import { chatStream, resolveModel } from "@/lib/models";
 import { haversineMiles, retrieveCandidates } from "@/lib/retrieval";
 import { createReferral } from "@/lib/store";
@@ -126,6 +127,7 @@ export async function* runPipeline(scenarioKey: string, opts: PipelineOpts = {})
 // Run the full pipeline on any job — a seeded scenario or a job composed on the spot.
 export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): AsyncGenerator<RunEvent> {
   const minAgreement = opts.minAgreement ?? (Number(process.env.MIN_AGREEMENT) || 0.6);
+  beginCostCapture();
   yield { type: "job", job };
 
   // 1. Opportunity Detector
@@ -145,6 +147,7 @@ export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): Asy
       draftedMessage: null,
       outcome: null,
     });
+    yield { type: "cost", summary: endCostCapture() };
     yield { type: "done", referralId: ref.id, decision: "declined" };
     return;
   }
@@ -214,5 +217,6 @@ export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): Asy
     draftedMessage: customerMessage,
     outcome: null,
   });
+  yield { type: "cost", summary: endCostCapture() };
   yield { type: "done", referralId: ref.id, decision: result.decision };
 }

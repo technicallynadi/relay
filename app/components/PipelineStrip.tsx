@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type JSX } from "react";
+import { formatUsd } from "@/lib/cost";
 import type { PipelineStage } from "@/lib/types";
 import {
   PIPELINE_STAGES,
@@ -57,6 +58,19 @@ export function PipelineStrip({ state }: Props) {
         <h2>Pipeline</h2>
         <span className="hint">
           Detector → Retriever → Jury → Composer
+          {state.cost && state.cost.calls > 0 && (
+            <>
+              {" · "}
+              <span className="mono" style={{ color: "var(--acc)" }}>
+                {formatUsd(state.cost.usd)}
+              </span>
+              <span className="mono">
+                {" · "}
+                {state.cost.calls} calls ·{" "}
+                {(state.cost.promptTokens + state.cost.completionTokens).toLocaleString()} tok
+              </span>
+            </>
+          )}
         </span>
       </div>
       <div className="panel-body">

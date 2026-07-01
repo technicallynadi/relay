@@ -1,5 +1,5 @@
 import { decideOpportunity } from "@/lib/board";
-import { addIncoming, clearIncoming, ensureSeeded, listIncoming } from "@/lib/incoming-store";
+import { addIncoming, clearIncoming, ensureSeeded, listIncoming, resolveIncoming } from "@/lib/incoming-store";
 import type { Job } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -23,7 +23,14 @@ export async function POST(req: Request) {
   return Response.json({ ok: true, opportunity });
 }
 
-export async function DELETE() {
+// DELETE ?jobId=X resolves a single opportunity (send/skip → it moves to Activity);
+// DELETE with no jobId clears the whole feed (and re-seeds the baseline on the next read).
+export async function DELETE(req: Request) {
+  const jobId = new URL(req.url).searchParams.get("jobId");
+  if (jobId) {
+    const removed = resolveIncoming(jobId);
+    return Response.json({ ok: removed != null });
+  }
   clearIncoming();
   return Response.json({ ok: true });
 }

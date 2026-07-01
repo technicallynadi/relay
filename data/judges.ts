@@ -61,7 +61,3 @@ export const JUDGES: Judge[] = DEFS.map((d) => ({
   ...d,
   weights: oceanToWeights(d.ocean),
 }));
-
-// Demo committee: 3 sharpest-tension lenses (Matchmaker fit ⟂ Steward in-network,
-// Closer conversion ⟂ Operator/Steward downside). Use all 5 for a richer panel.
-export const DEMO_JUDGE_IDS = ["matchmaker", "closer", "steward"];

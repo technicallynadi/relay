@@ -4,7 +4,12 @@ import { parse } from "yaml";
 
 export const runtime = "nodejs";
 
-const FALLBACK = { name: "dana akl", initials: "DA", org: "neighborly", location: "plano" };
+const FALLBACK = {
+  name: "unknown",
+  initials: "UK",
+  org: "neighborly",
+  location: "plano",
+};
 
 function initialsFrom(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

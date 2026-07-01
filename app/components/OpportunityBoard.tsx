@@ -37,8 +37,6 @@ interface Props {
   running: boolean;
   /** jobId of the card currently being routed through the live committee. */
   routingJobId: string | null;
-  /** jobIds the human gate has already sent — flips the badge to "sent ✓". */
-  sentJobIds: Set<string>;
   onMinAgreement: (v: number) => void;
   onDrillIn: (opp: BoardOpportunity) => void;
   onSend: (opp: BoardOpportunity) => void;
@@ -46,10 +44,14 @@ interface Props {
   onStats: (stats: BoardStats) => void;
   /** registers an opener so "+ new scan" / the top-bar field can expand the composer. */
   registerComposeOpener?: (open: () => void) => void;
+  /** registers an imperative feed refetch so compose/resolve reflect immediately. */
+  registerFeedRefresher?: (refresh: () => void) => void;
 }
 
 const POLL_INTERVAL_MS = 2000; // how often the board pulls the live feed
 const MARGIN_FLOOR = 0.15; // the Borda winner must clear the runner-up by this much
+const INITIAL_SHOWN = 10; // the feed shows a compact page; "show more" reveals the rest
+const PAGE_SIZE = 10;
 
 // The board's single source of truth for a card's decision: declined when there's no
 // cross-trade target, else auto-route when the jury's agreement clears the required bar
@@ -75,6 +77,7 @@ export function OpportunityBoard(p: Props) {
   const [paused, setPaused] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [everLoaded, setEverLoaded] = useState(false);
+  const [shown, setShown] = useState(INITIAL_SHOWN); // how many feed cards are expanded
 
   // Pull the live feed. The ingestion worker POSTs freshly-pulled jobs to /api/incoming;
   // we render the whole feed (newest first) and it grows as jobs stream in.
@@ -97,7 +100,14 @@ export function OpportunityBoard(p: Props) {
     return () => window.clearInterval(id);
   }, [paused, load]);
 
+  // Expose an imperative refetch so composing / resolving a card reflects at once.
+  const registerFeedRefresher = p.registerFeedRefresher;
+  useEffect(() => {
+    registerFeedRefresher?.(load);
+  }, [registerFeedRefresher, load]);
+
   const total = all.length;
+  const visible = all.slice(0, shown); // the feed renders a compact page of the newest
 
   // Report live stats up whenever the feed or the required-agreement dial changes — computed
   // over the whole live feed under the current decision, so the KPI row tracks it.
@@ -197,13 +207,12 @@ export function OpportunityBoard(p: Props) {
       )}
 
       <div className="opp-grid">
-        {all.map((opp) => (
+        {visible.map((opp) => (
           <OpportunityCard
             key={opp.jobId}
             opp={opp}
             minAgreement={p.minAgreement}
             routing={p.routingJobId === opp.jobId}
-            sent={p.sentJobIds.has(opp.jobId)}
             onDrillIn={p.onDrillIn}
             onSend={p.onSend}
           />
@@ -216,6 +225,29 @@ export function OpportunityBoard(p: Props) {
           registerOpener={p.registerComposeOpener}
         />
       </div>
+
+      {(total > shown || shown > INITIAL_SHOWN) && (
+        <div className="feed-pager">
+          {total > shown && (
+            <button
+              type="button"
+              className="feed-more"
+              onClick={() => setShown((n) => n + PAGE_SIZE)}
+            >
+              show {Math.min(PAGE_SIZE, total - shown)} more
+              <span className="mono">· {total - shown} below</span>
+              <span className="chev" aria-hidden="true">
+                ↓
+              </span>
+            </button>
+          )}
+          {shown > INITIAL_SHOWN && (
+            <button type="button" className="feed-less" onClick={() => setShown(INITIAL_SHOWN)}>
+              collapse ↑
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -224,12 +256,11 @@ interface CardProps {
   opp: BoardOpportunity;
   minAgreement: number;
   routing: boolean;
-  sent: boolean;
   onDrillIn: (opp: BoardOpportunity) => void;
   onSend: (opp: BoardOpportunity) => void;
 }
 
-function OpportunityCard({ opp, minAgreement, routing, sent, onDrillIn, onSend }: CardProps) {
+function OpportunityCard({ opp, minAgreement, routing, onDrillIn, onSend }: CardProps) {
   const decision = decisionFor(opp, minAgreement);
   const declined = decision === "declined";
 
@@ -237,24 +268,22 @@ function OpportunityCard({ opp, minAgreement, routing, sent, onDrillIn, onSend }
   const fillPct = opp.agreement == null ? 0 : Math.max(0, Math.min(1, opp.agreement)) * 100;
   const markPct = Math.max(0, Math.min(1, minAgreement)) * 100;
 
-  const badge = sent
-    ? { cls: "sent", text: "sent ✓" }
-    : decision === "auto"
+  const badge =
+    decision === "auto"
       ? { cls: "auto", text: "auto-route" }
       : decision === "escalated"
         ? { cls: "esc", text: "escalated" }
         : { cls: "muted", text: "declined" };
 
-  const cta = sent
-    ? { cls: "mut", text: "accepted" }
-    : decision === "auto"
+  const cta =
+    decision === "auto"
       ? { cls: "", text: "send →" }
       : decision === "escalated"
         ? { cls: "esc", text: "review →" }
         : { cls: "mut", text: "no referral" };
 
   const handleClick = () => {
-    if (declined || sent) return;
+    if (declined) return;
     if (decision === "auto") onSend(opp);
     else onDrillIn(opp);
   };
@@ -262,7 +291,7 @@ function OpportunityCard({ opp, minAgreement, routing, sent, onDrillIn, onSend }
   return (
     <button
       type="button"
-      className={`opp opp-card${decision === "escalated" && !sent ? " sel" : ""}`}
+      className={`opp opp-card${decision === "escalated" ? " sel" : ""}`}
       onClick={handleClick}
       disabled={declined || routing}
       aria-label={`${opp.brand} ${opp.location} — ${badge.text}`}

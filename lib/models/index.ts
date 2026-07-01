@@ -4,6 +4,7 @@
 // deterministic local fallback so the build is never blocked on a key).
 
 import OpenAI from "openai";
+import { recordUsage } from "@/lib/cost";
 
 export const EMBED_DIM = 1536; // text-embedding-3-small
 
@@ -56,6 +57,39 @@ export function resolveModel(preferred: string): string {
   return process.env.OPENAI_FALLBACK_MODEL || "gpt-4o-mini";
 }
 
+// When a call can't be afforded (out of credits/quota), retry down a chain of cheaper
+// models before giving up — the caller then degrades to the deterministic jury, which is
+// always free. Configure the chain with LLM_FALLBACK_MODELS; it's de-duped and resolved to
+// the active provider (on OpenAI-direct it collapses to one model, which is correct).
+const FALLBACK_MODELS = (process.env.LLM_FALLBACK_MODELS ?? "openai/gpt-4o-mini,google/gemini-2.5-flash")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function modelChain(requested: string): string[] {
+  const chain: string[] = [];
+  const seen = new Set<string>();
+  for (const m of [requested, ...FALLBACK_MODELS]) {
+    const r = resolveModel(m);
+    if (!seen.has(r)) {
+      seen.add(r);
+      chain.push(r);
+    }
+  }
+  return chain;
+}
+
+// OpenRouter returns 402 (OpenAI a quota error) when the balance can't cover a request;
+// a cheaper model needs less, so it may still go through.
+function isInsufficientFunds(err: unknown): boolean {
+  const e = err as { status?: number; code?: string; message?: string; error?: { message?: string; code?: string } };
+  if (e?.status === 402) return true;
+  const msg = `${e?.message ?? ""} ${e?.error?.message ?? ""} ${e?.code ?? ""} ${e?.error?.code ?? ""}`.toLowerCase();
+  return /insufficient|quota|credit|payment required|billing|not enough|balance/.test(msg);
+}
+
+const estimateTokens = (text: string): number => Math.ceil(text.length / 4); // if usage is omitted
+
 export interface ChatOpts {
   model: string;
   system?: string;
@@ -73,26 +107,76 @@ function buildMessages(opts: ChatOpts) {
 
 export async function chat(opts: ChatOpts): Promise<string> {
   const client = resolveChatClient();
-  const res = await client.chat.completions.create({
-    model: opts.model,
-    messages: buildMessages(opts),
-    temperature: opts.temperature ?? 0.2,
-    ...(opts.json ? { response_format: { type: "json_object" } } : {}),
-  });
-  return res.choices[0]?.message?.content ?? "";
+  const chain = modelChain(opts.model);
+  let lastErr: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    try {
+      const res = await client.chat.completions.create({
+        model,
+        messages: buildMessages(opts),
+        temperature: opts.temperature ?? 0.2,
+        ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+      });
+      recordUsage({
+        model,
+        promptTokens: res.usage?.prompt_tokens ?? estimateTokens((opts.system ?? "") + opts.user),
+        completionTokens: res.usage?.completion_tokens ?? estimateTokens(res.choices[0]?.message?.content ?? ""),
+      });
+      return res.choices[0]?.message?.content ?? "";
+    } catch (err) {
+      lastErr = err;
+      if (i < chain.length - 1 && isInsufficientFunds(err)) {
+        console.warn(`[models] ${model} couldn't be afforded — trying ${chain[i + 1]}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 export async function* chatStream(opts: ChatOpts): AsyncGenerator<string> {
   const client = resolveChatClient();
-  const stream = await client.chat.completions.create({
-    model: opts.model,
-    messages: buildMessages(opts),
-    temperature: opts.temperature ?? 0.2,
-    stream: true,
-  });
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) yield delta;
+  const chain = modelChain(opts.model);
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    try {
+      const stream = await client.chat.completions.create({
+        model,
+        messages: buildMessages(opts),
+        temperature: opts.temperature ?? 0.2,
+        stream: true,
+        stream_options: { include_usage: true },
+      });
+      let prompt = 0;
+      let completion = 0;
+      let outChars = 0;
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          outChars += delta.length;
+          yield delta;
+        }
+        if (chunk.usage) {
+          prompt = chunk.usage.prompt_tokens ?? prompt;
+          completion = chunk.usage.completion_tokens ?? completion;
+        }
+      }
+      // Estimate from text length if the provider omitted streamed usage, so cost is never blank.
+      recordUsage({
+        model,
+        promptTokens: prompt || estimateTokens((opts.system ?? "") + opts.user),
+        completionTokens: completion || Math.ceil(outChars / 4),
+      });
+      return;
+    } catch (err) {
+      if (i < chain.length - 1 && isInsufficientFunds(err)) {
+        console.warn(`[models] ${model} couldn't be afforded — trying ${chain[i + 1]}`);
+        continue;
+      }
+      throw err;
+    }
   }
 }
 

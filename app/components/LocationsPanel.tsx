@@ -37,16 +37,13 @@ export function LocationsPanel() {
     };
   }, []);
 
-  // Group brands by trade so each trade gets a small subhead above its cards.
-  const grouped = useMemo(() => {
+  // One roster sorted by trade, then name — rendered as a single grid that fills the width
+  // (grouping each trade into its own row left tiny, left-aligned cards with dead space).
+  const sorted = useMemo(() => {
     if (!brands) return [];
-    const byTrade = new Map<string, Brand[]>();
-    for (const b of brands) {
-      const list = byTrade.get(b.trade) ?? [];
-      list.push(b);
-      byTrade.set(b.trade, list);
-    }
-    return Array.from(byTrade.entries());
+    return [...brands].sort(
+      (a, b) => a.trade.localeCompare(b.trade) || a.name.localeCompare(b.name),
+    );
   }, [brands]);
 
   return (
@@ -76,30 +73,26 @@ export function LocationsPanel() {
           <span className="idle-title">Loading brands…</span>
           <span className="idle-sub">Reading the Neighborly franchise roster.</span>
         </div>
-      ) : grouped.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="idle">
           <span className="idle-title">No brands in the roster</span>
           <span className="idle-sub">The franchise roster came back empty.</span>
         </div>
       ) : (
-        grouped.map(([trade, list]) => (
-          <div key={trade} style={{ marginBottom: 18 }}>
-            <div className="seclab" style={{ marginBottom: 11 }}>
-              <b style={{ letterSpacing: "0.1em" }}>{tradeLabel(trade)}</b>
-              <span className="hint mono">{list.length}</span>
-            </div>
-            <div className="opp-grid">
-              {list.map((b) => (
-                <article key={b.id} className="opp">
-                  <div className="opp-h">
-                    <span className="trade">{tradeLabel(b.trade).toUpperCase()}</span>
-                  </div>
-                  <div className="opp-job">{b.name}</div>
-                </article>
-              ))}
-            </div>
-          </div>
-        ))
+        <div className="opp-grid">
+          {sorted.map((b) => (
+            <article key={b.id} className="opp">
+              <div className="opp-h">
+                <span className="trade">{tradeLabel(b.trade).toUpperCase()}</span>
+                <span className="badge auto">in-network</span>
+              </div>
+              <div className="opp-job">{b.name}</div>
+              <div className="opp-note" style={{ marginTop: 6, color: "var(--faint)" }}>
+                Plano, TX
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );

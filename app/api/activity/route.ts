@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 // Activity view reads this (empty until the operator routes something).
 export function GET() {
   const referrals = allReferrals()
+    // Activity lists referrals the operator acted on (sent/skipped) — a resolved job lives
+    // here, an open one is still in the feed. A drill-in you didn't act on stays open.
+    .filter((r) => r.humanAction != null)
     .map((r) => {
       const pid =
         r.committee?.consensusPartnerId ?? r.committee?.split?.partnerAId ?? r.candidateIds[0] ?? null;

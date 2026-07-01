@@ -1,13 +1,16 @@
 // Live KPI strip — computed from the session's real activity, never hardcoded.
 // DotGothic16 numbers in dot-matrix cards; neutral sublines (no vanity ▲ stats).
+import { formatUsd } from "@/lib/cost";
+
 interface Props {
   detected: number; // cross-trade opportunities surfaced this session
   autoCount: number; // routed runs that cleared the jury gate
   escalatedCount: number; // routed runs gated to a human
   avgSeconds: number | null; // measured avg time-to-route, null until a route runs
+  costUsd: number; // LLM spend this session — $0 in deterministic mode
 }
 
-export function KpiRow({ detected, autoCount, escalatedCount, avgSeconds }: Props) {
+export function KpiRow({ detected, autoCount, escalatedCount, avgSeconds, costUsd }: Props) {
   const routed = autoCount + escalatedCount;
   const autoPct = routed > 0 ? Math.round((100 * autoCount) / routed) : null;
 
@@ -27,6 +30,11 @@ export function KpiRow({ detected, autoCount, escalatedCount, avgSeconds }: Prop
       k: "avg time to route",
       v: avgSeconds == null ? "—" : `${avgSeconds.toFixed(1)}s`,
       d: avgSeconds == null ? "measured live" : "measured",
+    },
+    {
+      k: "LLM cost · session",
+      v: formatUsd(costUsd),
+      d: routed === 0 ? "$0 until you route" : costUsd === 0 ? "deterministic — free" : "live jury + composer",
     },
   ];
 

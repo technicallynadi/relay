@@ -1,6 +1,8 @@
 // Shared domain + pipeline contract for the Referral Opportunity Engine.
 // Every module builds against these types.
 
+import type { CostSummary } from "@/lib/cost";
+
 export type Trade =
   | "plumbing" | "hvac" | "electrical" | "restoration" | "cleaning"
   | "handyman" | "appliance" | "glass" | "landscaping" | "pest"
@@ -167,6 +169,7 @@ export type RunEvent =
   | { type: "committee"; result: CommitteeResult }
   | { type: "handoff"; handoff: Handoff }
   | { type: "done"; referralId: string; decision: Decision }
+  | { type: "cost"; summary: CostSummary }
   | { type: "error"; message: string };
 
 export type PipelineStage = "detector" | "retriever" | "committee" | "composer";
