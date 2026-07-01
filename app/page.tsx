@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { Decision, Job, RunEvent } from "@/lib/types";
+import type { JudgeInfo } from "@/lib/judges";
 import {
   emptyRun,
   reduceEvent,
@@ -86,6 +87,8 @@ export default function Relay() {
   const [jobs, setJobs] = useState<SeededJob[]>([]);
   const [brands, setBrands] = useState<BrandOpt[]>([]);
   const [adjacency, setAdjacency] = useState<AdjEdge[]>([]);
+  // The effective jury roster (models + providers from relay.config.yaml) for the jury cards.
+  const [judges, setJudges] = useState<JudgeInfo[]>([]);
   // jobId of the card being routed live through the committee (drill-in / send).
   const [routingJobId, setRoutingJobId] = useState<string | null>(null);
   // A brief concierge-style confirmation shown after a send/skip resolves a card.
@@ -126,6 +129,12 @@ export default function Relay() {
         setJobs(d.jobs ?? []);
         setBrands(d.brands ?? []);
         setAdjacency(d.adjacency ?? []);
+      })
+      .catch(() => {});
+    fetch("/api/judges")
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setJudges(d.judges ?? []);
       })
       .catch(() => {});
     return () => {
@@ -406,7 +415,7 @@ export default function Relay() {
 
             {reachedCommitteePhase && (
               <>
-                <CommitteePanel state={state} />
+                <CommitteePanel state={state} judges={judges} />
                 <div className="grid grid-main span-2">
                   <CandidateSheets state={state} />
                   <HumanGate state={state} onAction={handleAction} delivery={delivery} />

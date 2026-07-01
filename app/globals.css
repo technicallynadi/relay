@@ -1362,6 +1362,14 @@ textarea.field {
   background: var(--acc-d);
 }
 
+/* the specific model id (e.g. gpt-4o-mini) — neutral, keep its lowercase/hyphens */
+.chip.model {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--faint);
+  border-color: var(--line);
+}
+
 .judge-pick {
   font-size: 11px;
   color: var(--faint);

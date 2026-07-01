@@ -4,7 +4,7 @@
 
 import { adjacentTrades } from "@/data/adjacency";
 import { JOB_BY_SCENARIO } from "@/data/jobs";
-import { JUDGES } from "@/data/judges";
+import { effectiveJudges } from "@/lib/judges";
 import { getPartners } from "@/lib/places";
 import { gate, runJudge } from "@/lib/committee";
 import { beginCostCapture, endCostCapture } from "@/lib/cost";
@@ -162,16 +162,17 @@ export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): Asy
   // 3. Routing Validator (the jury)
   yield { type: "stage", stage: "committee", status: "start" };
   const order = candidates.map((c) => c.partner.id);
+  const judges = effectiveJudges();
   const q = makeQueue<JudgeRead>();
   const all = Promise.all(
-    JUDGES.map((j) =>
+    judges.map((j) =>
       runJudge(j, candidates, job).then((r) => {
         q.push(r);
         return r;
       }),
     ),
   );
-  for await (const read of q.drain(JUDGES.length)) {
+  for await (const read of q.drain(judges.length)) {
     yield { type: "judge_read", read };
   }
   const reads = await all;

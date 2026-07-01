@@ -6,3 +6,12 @@ profile:
   org: Neighborly
   location: Plano, TX
   initials: JV # shown in the avatar; remove this line to auto-derive from the name
+
+# Jury models — swap any judge's model here (OpenRouter slugs); reload to pick it up.
+# The provider label and model name shown on each judge card are derived from the slug.
+judges:
+  matchmaker: openai/gpt-4o-mini
+  operator: anthropic/claude-haiku-4.5
+  closer: meta-llama/llama-3.1-70b-instruct
+  concierge: anthropic/claude-sonnet-4.6
+  steward: google/gemini-2.5-flash

@@ -4,7 +4,8 @@ import { oceanToWeights } from "@/lib/committee/personality";
 // The committee panel. Each judge is a distinct evaluation lens; its OCEAN vector is a
 // DOCUMENTED PRIOR that derives the criteria weights (never role-played in the prompt).
 // Models deliberately span families — cross-family diversity is the evidence-backed
-// source of useful disagreement. Model ids are OpenRouter slugs; override via JUDGE_MODELS.
+// source of useful disagreement. Model ids are OpenRouter slugs (the defaults); override any
+// judge's model per-id in relay.config.yaml (see lib/judges.ts).
 interface JudgeDef {
   id: string;
   name: string;

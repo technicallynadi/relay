@@ -5,6 +5,7 @@ import type { RunState } from "./runState";
 import { IconCheck, IconAlert, IconGem } from "./icons";
 import { JudgeAvatar } from "./JudgeAvatar";
 import { JUDGE_ROSTER, type JudgePersona } from "./judgePersonas";
+import type { JudgeInfo } from "@/lib/judges";
 
 // Concordance (Kendall's W) and the required-agreement threshold both live in [0,1];
 // render the meter across the full range so the fill and the threshold marker line up
@@ -24,9 +25,10 @@ const JUDGE_LENS: Record<string, string> = {
 
 interface Props {
   state: RunState;
+  judges: JudgeInfo[];
 }
 
-export function CommitteePanel({ state }: Props) {
+export function CommitteePanel({ state, judges }: Props) {
   const committeeStarted = state.stages.committee !== "queued" && state.stages.committee !== "skipped";
   const { reads, committee, candidates } = state;
 
@@ -41,6 +43,7 @@ export function CommitteePanel({ state }: Props) {
   // Render all five judges in a stable order: each shows a "thinking" avatar until its
   // read lands, then settles into its card — so you watch the jury deliberate live.
   const readById = new Map<string, JudgeRead>(reads.map((r) => [r.judgeId, r]));
+  const infoById = new Map<string, JudgeInfo>(judges.map((j) => [j.id, j]));
 
   return (
     <section className="panel span-2" aria-label="Jury">
@@ -68,11 +71,13 @@ export function CommitteePanel({ state }: Props) {
             <div className="judges">
               {JUDGE_ROSTER.map((persona) => {
                 const read = readById.get(persona.id);
-                if (!read) return <JudgeThinking key={persona.id} persona={persona} />;
+                const info = infoById.get(persona.id);
+                if (!read) return <JudgeThinking key={persona.id} persona={persona} info={info} />;
                 return (
                   <JudgeCard
                     key={persona.id}
                     persona={persona}
+                    info={info}
                     read={read}
                     pickedName={nameById.get(read.topCandidateId) ?? read.topCandidateId}
                     isDisputed={
@@ -97,12 +102,14 @@ export function CommitteePanel({ state }: Props) {
 
 function JudgeCard({
   persona,
+  info,
   read,
   pickedName,
   isDisputed,
   isAligned,
 }: {
   persona: JudgePersona;
+  info?: JudgeInfo;
   read: JudgeRead;
   pickedName: string;
   isDisputed: boolean;
@@ -118,7 +125,12 @@ function JudgeCard({
       </div>
       <span className="judge-lens">{lens}</span>
       <div className="chip-row">
-        <span className="chip family">{read.modelFamily}</span>
+        {info?.model && (
+          <span className="chip model" title={`${info.model} · ${info.provider}`}>
+            {info.model}
+          </span>
+        )}
+        <span className="chip family">{info?.provider ?? read.modelFamily}</span>
       </div>
       <div className="judge-pick">
         picked&nbsp;<b>{pickedName}</b>
@@ -134,7 +146,7 @@ function JudgeCard({
   );
 }
 
-function JudgeThinking({ persona }: { persona: JudgePersona }) {
+function JudgeThinking({ persona, info }: { persona: JudgePersona; info?: JudgeInfo }) {
   return (
     <article className="judge-card thinking-card">
       <div className="judge-top">
@@ -142,7 +154,12 @@ function JudgeThinking({ persona }: { persona: JudgePersona }) {
         <span className="judge-name">{persona.name}</span>
       </div>
       <div className="chip-row">
-        <span className="chip family">{persona.family}</span>
+        {info?.model && (
+          <span className="chip model" title={`${info.model} · ${info.provider}`}>
+            {info.model}
+          </span>
+        )}
+        <span className="chip family">{info?.provider ?? persona.family}</span>
       </div>
       <div className="thinking-line">
         <span className="thinking-dots" aria-hidden="true">

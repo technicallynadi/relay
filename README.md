@@ -115,8 +115,6 @@ The five judges run across **different model families** because the diversity is
 
 Five lenses, deliberately spanning **four model families** so their agreement means something:
 
-![The five judges — dot-matrix persona avatars, one per model family](docs/assets/judges.svg)
-
 | Judge | The lens it argues from | Model | Family |
 |---|---|---|---|
 | **The Matchmaker** | the best technical fit for the job, even out-of-network | `gpt-4o-mini` | OpenAI |
