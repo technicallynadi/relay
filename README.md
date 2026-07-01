@@ -19,7 +19,7 @@ You need [**Bun**](https://bun.sh) and **Node ≥ 20**. From a terminal:
 curl -fsSL https://bun.sh/install | bash
 
 # 2 — clone and install dependencies
-git clone https://github.com/nadirahdurr/relay.git
+git clone https://github.com/technicallynadi/relay.git
 cd relay
 bun install
 
