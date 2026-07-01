@@ -34,7 +34,7 @@ export const STAGE_META: Record<
 > = {
   detector: { label: "Opportunity Detector", blurb: "Cross-trade signal?" },
   retriever: { label: "Partner Retriever", blurb: "Federated candidates" },
-  committee: { label: "CRPC Committee", blurb: "δ<ε convergence gate" },
+  committee: { label: "Jury", blurb: "Kendall's W agreement gate" },
   composer: { label: "Handoff Composer", blurb: "Customer message" },
 };
 

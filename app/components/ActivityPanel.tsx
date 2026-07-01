@@ -14,7 +14,7 @@ interface Referral {
   decision: Decision;
   action: string | null;
   outcome: string | null;
-  delta: number | null;
+  agreement: number | null;
   createdAt: string;
 }
 
@@ -104,9 +104,9 @@ export function ActivityPanel() {
                     marginTop: 6,
                   }}
                 >
-                  {r.delta != null && (
+                  {r.agreement != null && (
                     <span className="mono" style={{ fontSize: 11, color: "var(--mut)" }}>
-                      δ {r.delta.toFixed(2)}
+                      W {r.agreement.toFixed(2)}
                     </span>
                   )}
                   <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>

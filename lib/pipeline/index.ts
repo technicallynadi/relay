@@ -111,7 +111,7 @@ function makeQueue<T>() {
 }
 
 export interface PipelineOpts {
-  epsilon?: number;
+  minAgreement?: number;
 }
 
 export async function* runPipeline(scenarioKey: string, opts: PipelineOpts = {}): AsyncGenerator<RunEvent> {
@@ -125,7 +125,7 @@ export async function* runPipeline(scenarioKey: string, opts: PipelineOpts = {})
 
 // Run the full pipeline on any job — a seeded scenario or a job composed on the spot.
 export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): AsyncGenerator<RunEvent> {
-  const epsilon = opts.epsilon ?? (Number(process.env.EPSILON) || 0.15);
+  const minAgreement = opts.minAgreement ?? (Number(process.env.MIN_AGREEMENT) || 0.6);
   yield { type: "job", job };
 
   // 1. Opportunity Detector
@@ -156,7 +156,7 @@ export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): Asy
   yield { type: "candidates", candidates };
   yield { type: "stage", stage: "retriever", status: "done" };
 
-  // 3. Routing Validator (CRPC committee)
+  // 3. Routing Validator (the jury)
   yield { type: "stage", stage: "committee", status: "start" };
   const order = candidates.map((c) => c.partner.id);
   const q = makeQueue<JudgeRead>();
@@ -172,7 +172,7 @@ export async function* runPipelineForJob(job: Job, opts: PipelineOpts = {}): Asy
     yield { type: "judge_read", read };
   }
   const reads = await all;
-  const result = gate({ candidateOrder: order, reads, epsilon });
+  const result = gate({ candidateOrder: order, reads, minAgreement });
   yield { type: "committee", result };
   yield { type: "stage", stage: "committee", status: "done" };
 

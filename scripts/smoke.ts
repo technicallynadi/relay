@@ -6,7 +6,7 @@ import { runPipeline } from "@/lib/pipeline";
 for (const key of ["drain-job", "ac-tuneup", "shelf-install"]) {
   console.log(`\n=== scenario: ${key} ===`);
   let decision = "?";
-  for await (const ev of runPipeline(key, { epsilon: 0.15 })) {
+  for await (const ev of runPipeline(key, { minAgreement: 0.6 })) {
     if (ev.type === "detection") {
       console.log(`  detector: hasReferral=${ev.detection.hasReferral} trade=${ev.detection.trade ?? "—"}`);
     } else if (ev.type === "candidates") {
@@ -16,7 +16,7 @@ for (const key of ["drain-job", "ac-tuneup", "shelf-install"]) {
     } else if (ev.type === "committee") {
       const r = ev.result;
       console.log(
-        `  committee: δmax=${r.deltaMax.toFixed(3)} ε=${r.epsilon} converged=${r.converged} → ${r.decision}` +
+        `  jury: W=${r.concordance.toFixed(3)} need=${r.minAgreement} margin=${r.topMargin.toFixed(2)} converged=${r.converged} → ${r.decision}` +
           (r.consensusPartnerId ? ` consensus=${r.consensusPartnerId}` : "") +
           (r.split ? ` split=${r.split.partnerAId} vs ${r.split.partnerBId}` : ""),
       );

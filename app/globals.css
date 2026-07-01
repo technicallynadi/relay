@@ -626,20 +626,20 @@ select {
    ε knob
    ---------------------------------------------------------------------------- */
 
-.epsilon-knob {
+.agreement-knob {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 240px;
 }
 
-.epsilon-knob .lab {
+.agreement-knob .lab {
   font-size: 11px;
   color: var(--mut);
   white-space: nowrap;
 }
 
-.epsilon-knob .val {
+.agreement-knob .val {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;

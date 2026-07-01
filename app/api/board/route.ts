@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 // board / live feed. Fast (no LLM): detect → retrieve → deterministic committee. The
 // live LLM committee runs only when the operator drills into a card.
 export async function GET() {
-  const epsilon = Number(process.env.EPSILON) || 0.15;
+  const minAgreement = Number(process.env.MIN_AGREEMENT) || 0.6;
   const opportunities = [];
 
   for (const job of JOBS) {
@@ -25,18 +25,18 @@ export async function GET() {
       location: job.location.label,
       summary: job.summary,
       techNotes: job.techNotes,
-      epsilon,
+      minAgreement,
     };
 
     const detection = detect(job);
     if (!detection.hasReferral || !detection.trade) {
-      opportunities.push({ ...base, trade: null, decision: "declined", partner: null, delta: null });
+      opportunities.push({ ...base, trade: null, decision: "declined", partner: null, agreement: null, margin: null });
       continue;
     }
 
     const partners = await getPartners(detection.trade, job.location);
     const candidates = await retrieveCandidates(partners, job, detection.trade);
-    const result = runCommitteeDeterministic(JUDGES, candidates, epsilon);
+    const result = runCommitteeDeterministic(JUDGES, candidates, minAgreement);
     const pid =
       result.consensusPartnerId ?? result.split?.partnerAId ?? candidates[0]?.partner.id ?? null;
     const partnerName = pid ? (candidates.find((c) => c.partner.id === pid)?.partner.name ?? null) : null;
@@ -45,7 +45,8 @@ export async function GET() {
       trade: detection.trade,
       decision: result.decision,
       partner: partnerName,
-      delta: result.deltaMax,
+      agreement: result.concordance,
+      margin: result.topMargin,
     });
   }
 

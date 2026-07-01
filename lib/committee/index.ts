@@ -1,7 +1,7 @@
-// The CRPC-style committee: diverse judges score the candidates independently
-// (commit), reveal preference vectors, and we gate the routing on whether they
-// converge (pairwise δ < ε). Adapted from Tim Cotten's Commit-Reveal Pairwise
-// Comparison Protocol — eval core lifted out of the trustless setting.
+// The jury: a panel of diverse LLM judges (Panel of LLM evaluators / PoLL; Verga et al.
+// 2024) that each rank the candidates independently, and we gate the routing on how much
+// they agree — Kendall's W, the coefficient of concordance (Kendall & Babington Smith,
+// 1939). High concordance + a clear Borda winner ⇒ auto-route; a split jury ⇒ escalate.
 
 import {
   CRITERIA,
@@ -30,109 +30,103 @@ export function judgeScore(sub: SubScores, w: Weights): number {
   return den ? num / den : 0;
 }
 
-function mean(v: number[]): number {
-  return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0;
+// Ranks for one judge's preference vector: rank 1 = best (highest score). Equal scores
+// share the average (mid) rank. Aligned to the `preference` index order.
+function ranksOf(preference: number[]): number[] {
+  const n = preference.length;
+  const idx = preference.map((_, i) => i).sort((a, b) => preference[b] - preference[a]);
+  const ranks = new Array<number>(n).fill(0);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && preference[idx[j + 1]] === preference[idx[i]]) j++;
+    const avg = (i + j) / 2 + 1; // 1-based average rank across the tie group
+    for (let k = i; k <= j; k++) ranks[idx[k]] = avg;
+    i = j + 1;
+  }
+  return ranks;
 }
 
-// Correlation = cosine of mean-centered vectors. Sensitive to how judges RANK the
-// candidates rather than to overall score level — two judges who both score everyone
-// ~0.7 but flip the winner are correctly seen as disagreeing.
-function correlation(a: number[], b: number[]): number {
-  const ma = mean(a);
-  const mb = mean(b);
-  let dot = 0;
-  let na = 0;
-  let nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ca = a[i] - ma;
-    const cb = b[i] - mb;
-    dot += ca * cb;
-    na += ca * ca;
-    nb += cb * cb;
+// Kendall's W (coefficient of concordance) over m judges ranking n candidates. W = 1 →
+// the jury agrees on one ranking; W = 0 → no better than random. Also returns the
+// per-candidate rank-sum, which drives the Borda consensus winner.
+export function kendallW(reads: JudgeRead[]): { W: number; rankSum: number[] } {
+  const m = reads.length;
+  const n = reads[0]?.preference.length ?? 0;
+  const rankSum = new Array<number>(n).fill(0);
+  for (const r of reads) {
+    const ranks = ranksOf(r.preference);
+    for (let i = 0; i < n; i++) rankSum[i] += ranks[i];
   }
-  const d = Math.sqrt(na) * Math.sqrt(nb);
-  return d ? dot / d : 1; // a flat (indifferent) judge agrees with everyone
+  if (m < 1 || n < 2) return { W: 1, rankSum };
+  const meanR = (m * (n + 1)) / 2;
+  let S = 0;
+  for (const R of rankSum) S += (R - meanR) ** 2;
+  const W = (12 * S) / (m * m * (n ** 3 - n));
+  return { W: clamp01(W), rankSum };
 }
 
-// Pairwise δ = (1 − correlation(Φᵢ, Φⱼ)) / 2 ∈ [0,1]: ranking disagreement between two
-// judges. 0 = identical ranking, 1 = perfectly inverted. The ranking-sensitive form of
-// CRPC's cosine δ.
-export function computeDeltaMatrix(reads: JudgeRead[]): number[][] {
-  const n = reads.length;
-  const m = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = (1 - correlation(reads[i].preference, reads[j].preference)) / 2;
-      m[i][j] = d;
-      m[j][i] = d;
-    }
-  }
-  return m;
-}
+const DEFAULT_MARGIN_FLOOR = 0.15;
 
 export interface GateInput {
   candidateOrder: string[];
   reads: JudgeRead[];
-  epsilon: number;
-  noiseFloor?: number;
+  minAgreement: number; // required jury concordance (Kendall's W) to auto-route
+  marginFloor?: number; // the winner must clear the runner-up by this Borda margin
 }
 
-// The δ<ε gate. Pure: given judge reads, decide auto-route vs escalate.
-export function gate({ candidateOrder, reads, epsilon, noiseFloor = 0.02 }: GateInput): CommitteeResult {
-  const deltaMatrix = computeDeltaMatrix(reads);
-  let deltaMax = 0;
-  let sum = 0;
-  let pairs = 0;
-  let maxI = 0;
-  let maxJ = reads.length > 1 ? 1 : 0;
-  for (let i = 0; i < reads.length; i++) {
-    for (let j = i + 1; j < reads.length; j++) {
-      const d = deltaMatrix[i][j];
-      sum += d;
-      pairs++;
-      if (d > deltaMax) {
-        deltaMax = d;
-        maxI = i;
-        maxJ = j;
-      }
-    }
-  }
-  const deltaMean = pairs ? sum / pairs : 0;
-  const converged = deltaMax < epsilon;
+// The jury gate. Pure: given the judges' rankings, decide auto-route vs escalate.
+// Auto-route only when the jury's concordance clears `minAgreement` AND the Borda winner
+// clears the runner-up by `marginFloor` — concordance scores the whole ranking, the
+// margin guard protects the one thing routing cares about: the top slot.
+export function gate({
+  candidateOrder,
+  reads,
+  minAgreement,
+  marginFloor = DEFAULT_MARGIN_FLOOR,
+}: GateInput): CommitteeResult {
+  const m = reads.length;
+  const n = candidateOrder.length;
+  const { W, rankSum } = kendallW(reads);
+  const avgPairwiseAgreement = m > 1 ? (m * W - 1) / (m - 1) : 1;
 
-  const meanScore: Record<string, number> = {};
-  for (const id of candidateOrder) {
-    meanScore[id] = reads.reduce((s, r) => s + (r.scores[id] ?? 0), 0) / (reads.length || 1);
-  }
-  const consensusPartnerId = candidateOrder.length
-    ? candidateOrder.reduce((a, b) => (meanScore[b] > meanScore[a] ? b : a))
-    : null;
+  // Borda points bᵢ = m·n − rankSumᵢ (higher = better) → consensus winner + runner-up.
+  const borda = rankSum.map((R) => m * n - R);
+  const byBorda = candidateOrder.map((_, i) => i).sort((a, b) => borda[b] - borda[a]);
+  const winnerIdx = byBorda[0] ?? 0;
+  const runnerIdx = byBorda[1] ?? winnerIdx;
+  const spread = m * (n - 1);
+  const topMargin = spread > 0 ? clamp01((borda[winnerIdx] - borda[runnerIdx]) / spread) : 1;
+  const winnerId = candidateOrder[winnerIdx] ?? null;
+  const runnerUpId = candidateOrder[runnerIdx] ?? null;
 
+  const converged = W >= minAgreement && topMargin >= marginFloor;
   const base = {
     candidateOrder,
     reads,
-    deltaMatrix,
-    deltaMax,
-    deltaMean,
-    epsilon,
-    noiseFloor,
+    concordance: W,
+    avgPairwiseAgreement,
+    minAgreement,
+    topMargin,
+    marginFloor,
   };
 
   if (converged) {
-    return { ...base, converged: true, consensusPartnerId, decision: "auto_route_eligible" };
+    return { ...base, converged: true, consensusPartnerId: winnerId, decision: "auto_route_eligible" };
   }
-  const a = reads[maxI];
-  const b = reads[maxJ];
+  const reason =
+    W < minAgreement
+      ? `jury agreement W=${W.toFixed(2)} is below the required ${minAgreement.toFixed(2)}`
+      : `the top two are within the margin guard (${topMargin.toFixed(2)} < ${marginFloor.toFixed(2)})`;
   return {
     ...base,
     converged: false,
     consensusPartnerId: null,
     decision: "escalated",
-    split: {
-      partnerAId: a.topCandidateId,
-      partnerBId: b.topCandidateId,
-      note: `${a.judgeName} and ${b.judgeName} favor different partners (δ=${deltaMax.toFixed(2)} ≥ ε=${epsilon.toFixed(2)}). Human decides.`,
-    },
+    split:
+      winnerId && runnerUpId
+        ? { partnerAId: winnerId, partnerBId: runnerUpId, note: `Jury split — ${reason}. Human decides.` }
+        : undefined,
   };
 }
 
@@ -226,7 +220,7 @@ export async function runCommittee(
   judges: Judge[],
   candidates: Candidate[],
   job: Job,
-  epsilon: number,
+  minAgreement: number,
   onRead?: (read: JudgeRead) => void,
 ): Promise<CommitteeResult> {
   const order = candidates.map((c) => c.partner.id);
@@ -237,7 +231,7 @@ export async function runCommittee(
       return r;
     }),
   );
-  return gate({ candidateOrder: order, reads, epsilon });
+  return gate({ candidateOrder: order, reads, minAgreement });
 }
 
 // Deterministic committee (no LLM): each judge scores purely on the pre-computed
@@ -261,11 +255,11 @@ export function deterministicRead(judge: Judge, candidates: Candidate[], order: 
 export function runCommitteeDeterministic(
   judges: Judge[],
   candidates: Candidate[],
-  epsilon: number,
+  minAgreement: number,
 ): CommitteeResult {
   const order = candidates.map((c) => c.partner.id);
   const reads = judges.map((j) => deterministicRead(j, candidates, order));
-  return gate({ candidateOrder: order, reads, epsilon });
+  return gate({ candidateOrder: order, reads, minAgreement });
 }
 
 export type { Criterion };

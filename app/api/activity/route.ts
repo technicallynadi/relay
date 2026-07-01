@@ -18,7 +18,7 @@ export function GET() {
         decision: r.decision,
         action: r.humanAction,
         outcome: r.outcome,
-        delta: r.committee?.deltaMax ?? null,
+        agreement: r.committee?.concordance ?? null,
         createdAt: r.createdAt,
       };
     })

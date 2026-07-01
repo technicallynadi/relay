@@ -56,7 +56,7 @@ export function PipelineStrip({ state }: Props) {
       <div className="panel-head">
         <h2>Pipeline</h2>
         <span className="hint">
-          Detector → Retriever → CRPC committee → Composer
+          Detector → Retriever → Jury → Composer
         </span>
       </div>
       <div className="panel-body">

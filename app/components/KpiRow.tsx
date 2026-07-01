@@ -2,7 +2,7 @@
 // DotGothic16 numbers in dot-matrix cards; neutral sublines (no vanity ▲ stats).
 interface Props {
   detected: number; // cross-trade opportunities surfaced this session
-  autoCount: number; // routed runs that cleared the δ<ε gate
+  autoCount: number; // routed runs that cleared the jury gate
   escalatedCount: number; // routed runs gated to a human
   avgSeconds: number | null; // measured avg time-to-route, null until a route runs
 }
@@ -21,7 +21,7 @@ export function KpiRow({ detected, autoCount, escalatedCount, avgSeconds }: Prop
     {
       k: "auto-routed",
       v: autoPct == null ? "—" : `${autoPct}%`,
-      d: autoPct == null ? "δ<ε gate" : `${100 - autoPct}% to a human`,
+      d: autoPct == null ? "jury gate" : `${100 - autoPct}% to a human`,
     },
     {
       k: "avg time to route",

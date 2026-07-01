@@ -30,49 +30,49 @@ function mkRead(name: string, scores: Record<string, number>, order: string[]): 
   return { judgeId: name, judgeName: name, modelFamily: "test", scores, preference, topCandidateId: top, rationale: "" };
 }
 
-describe("gate — δ<ε decides auto-route vs escalate", () => {
+describe("gate — Kendall's W concordance decides auto-route vs escalate", () => {
   const order = ["a", "b"];
 
-  test("converged committee → auto_route_eligible with a consensus partner", () => {
+  test("unanimous jury → auto_route_eligible with a Borda consensus winner", () => {
     const reads = [
       mkRead("j1", { a: 0.9, b: 0.4 }, order),
       mkRead("j2", { a: 0.85, b: 0.45 }, order),
       mkRead("j3", { a: 0.88, b: 0.42 }, order),
     ];
-    const r = gate({ candidateOrder: order, reads, epsilon: 0.1 });
+    const r = gate({ candidateOrder: order, reads, minAgreement: 0.6 });
     expect(r.converged).toBe(true);
     expect(r.decision).toBe("auto_route_eligible");
     expect(r.consensusPartnerId).toBe("a");
-    expect(r.deltaMax).toBeLessThan(0.1);
+    expect(r.concordance).toBeGreaterThanOrEqual(0.6);
   });
 
-  test("split committee → escalated, no consensus, surfaces the disputed pair", () => {
+  test("split jury → escalated, no consensus, surfaces the contested pair", () => {
     const reads = [
       mkRead("j1", { a: 0.9, b: 0.3 }, order),
       mkRead("j2", { a: 0.3, b: 0.9 }, order),
       mkRead("j3", { a: 0.85, b: 0.35 }, order),
     ];
-    const r = gate({ candidateOrder: order, reads, epsilon: 0.1 });
+    const r = gate({ candidateOrder: order, reads, minAgreement: 0.6 });
     expect(r.converged).toBe(false);
     expect(r.decision).toBe("escalated");
     expect(r.consensusPartnerId).toBeNull();
-    expect(r.deltaMax).toBeGreaterThanOrEqual(0.1);
+    expect(r.concordance).toBeLessThan(0.6);
     expect(r.split).toBeDefined();
     expect([r.split?.partnerAId, r.split?.partnerBId].sort()).toEqual(["a", "b"]);
   });
 
-  test("graded δ: a looser ε auto-routes a partial disagreement that a tighter ε escalates", () => {
+  test("the required-agreement threshold flips a partial-agreement ranking", () => {
     const order3 = ["a", "b", "c"];
     const reads = [
       mkRead("j1", { a: 0.9, b: 0.5, c: 0.4 }, order3),
       mkRead("j2", { a: 0.5, b: 0.9, c: 0.4 }, order3),
       mkRead("j3", { a: 0.85, b: 0.55, c: 0.4 }, order3),
     ];
-    const loose = gate({ candidateOrder: order3, reads, epsilon: 0.9 });
-    const tight = gate({ candidateOrder: order3, reads, epsilon: 0.05 });
-    expect(loose.decision).toBe("auto_route_eligible");
-    expect(tight.decision).toBe("escalated");
-    expect(loose.deltaMax).toBeGreaterThan(0.05);
-    expect(loose.deltaMax).toBeLessThan(0.9);
+    const lenient = gate({ candidateOrder: order3, reads, minAgreement: 0.2 });
+    const strict = gate({ candidateOrder: order3, reads, minAgreement: 0.95 });
+    expect(lenient.decision).toBe("auto_route_eligible");
+    expect(strict.decision).toBe("escalated");
+    expect(lenient.concordance).toBeGreaterThan(0.2);
+    expect(lenient.concordance).toBeLessThan(0.95);
   });
 });

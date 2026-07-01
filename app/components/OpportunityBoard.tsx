@@ -5,9 +5,9 @@ import { DotGrid } from "./DotGrid";
 import { IconPen, IconScan, IconTune } from "./icons";
 import type { BrandOpt } from "./JobConsole";
 
-// A decided opportunity row from GET /api/board. The decision the server sent is
-// advisory only — the board re-decides every card live against the operator's ε
-// (see `decisionFor`), so dragging the trust dial re-routes the whole grid.
+// A decided opportunity row from GET /api/board. The server's decision is advisory —
+// the board re-decides every card live against the operator's required-agreement dial
+// (see `decisionFor`), so dragging it re-routes the whole grid.
 export interface BoardOpportunity {
   jobId: string;
   brandId: string;
@@ -18,8 +18,9 @@ export interface BoardOpportunity {
   summary: string;
   techNotes: string;
   partner: string | null;
-  delta: number | null;
-  epsilon: number;
+  agreement: number | null; // jury concordance (Kendall's W)
+  margin: number | null; // Borda winner's lead over the runner-up
+  minAgreement: number; // the server's default threshold
 }
 
 export type BoardDecision = "auto" | "escalated" | "declined";
@@ -32,13 +33,13 @@ export interface BoardStats {
 
 interface Props {
   brands: BrandOpt[];
-  epsilon: number;
+  minAgreement: number;
   running: boolean;
   /** jobId of the card currently being routed through the live committee. */
   routingJobId: string | null;
   /** jobIds the human gate has already sent — flips the badge to "sent ✓". */
   sentJobIds: Set<string>;
-  onEpsilon: (v: number) => void;
+  onMinAgreement: (v: number) => void;
   onDrillIn: (opp: BoardOpportunity) => void;
   onSend: (opp: BoardOpportunity) => void;
   onCompose: (brandId: string, techNotes: string) => void;
@@ -48,12 +49,14 @@ interface Props {
 }
 
 const REVEAL_INTERVAL_MS = 2400;
+const MARGIN_FLOOR = 0.15; // the Borda winner must clear the runner-up by this much
 
-// The board's single source of truth for a card's decision: declined when there's
-// no cross-trade target, else δ<ε auto-routes and δ≥ε escalates to a human.
-function decisionFor(opp: BoardOpportunity, epsilon: number): BoardDecision {
-  if (opp.trade == null || opp.delta == null) return "declined";
-  return opp.delta < epsilon ? "auto" : "escalated";
+// The board's single source of truth for a card's decision: declined when there's no
+// cross-trade target, else auto-route when the jury's agreement clears the required bar
+// AND the top pick is clear enough — otherwise escalate to a human.
+function decisionFor(opp: BoardOpportunity, minAgreement: number): BoardDecision {
+  if (opp.trade == null || opp.agreement == null) return "declined";
+  return opp.agreement >= minAgreement && (opp.margin ?? 0) >= MARGIN_FLOOR ? "auto" : "escalated";
 }
 
 // A stable dot-pattern per card so the matrix glyph varies but never flickers.
@@ -106,18 +109,18 @@ export function OpportunityBoard(p: Props) {
 
   const visible = useMemo(() => all.slice(0, revealed), [all, revealed]);
 
-  // Report live stats up whenever the revealed set or ε changes — computed from the
-  // REVEALED cards under the live ε decision, so the KPI row tracks the trust dial.
+  // Report live stats up whenever the revealed set or the required-agreement dial changes
+  // — computed from the REVEALED cards under the live decision, so the KPI row tracks it.
   const stats = useMemo<BoardStats>(() => {
     let auto = 0;
     let escalated = 0;
     for (const opp of visible) {
-      const d = decisionFor(opp, p.epsilon);
+      const d = decisionFor(opp, p.minAgreement);
       if (d === "auto") auto++;
       else if (d === "escalated") escalated++;
     }
     return { detected: visible.length, auto, escalated };
-  }, [visible, p.epsilon]);
+  }, [visible, p.minAgreement]);
 
   const onStats = p.onStats;
   useEffect(() => {
@@ -139,7 +142,7 @@ export function OpportunityBoard(p: Props) {
 
   return (
     <section aria-label="Live opportunity feed">
-      {/* ---- Feed control row + ε trust dial ---- */}
+      {/* ---- Feed control row + required-agreement dial ---- */}
       <div className="seclab">
         <div className="feed-ctl">
           <span className={`feed-pulse${paused || caughtUp ? " off" : ""}`} aria-hidden="true" />
@@ -167,36 +170,34 @@ export function OpportunityBoard(p: Props) {
             ✕ clear
           </button>
         </div>
-        <div className="epsilon-knob">
+        <div className="agreement-knob">
           <IconTune size={15} />
-          <span className="lab">
-            tolerance <span className="mono">ε</span>
-          </span>
+          <span className="lab">required agreement</span>
           <input
             type="range"
             min={0.01}
             max={1}
             step={0.01}
-            value={p.epsilon}
+            value={p.minAgreement}
             disabled={p.running}
-            onChange={(e) => p.onEpsilon(Number(e.target.value))}
-            aria-label="Epsilon route threshold"
+            onChange={(e) => p.onMinAgreement(Number(e.target.value))}
+            aria-label="Required jury agreement to auto-route"
           />
-          <span className="val mono">{p.epsilon.toFixed(2)}</span>
+          <span className="val mono">{p.minAgreement.toFixed(2)}</span>
         </div>
       </div>
 
       <div style={{ fontSize: 12, color: "var(--mut)", margin: "2px 2px 14px", lineHeight: 1.55 }}>
         <b className="mono" style={{ color: "var(--ink)" }}>
-          δ
+          W
         </b>{" "}
-        = how much the judges disagree on the best partner ·{" "}
+        = how much the jury agrees on the ranking (Kendall&rsquo;s W, 0–1) ·{" "}
         <b className="mono" style={{ color: "var(--amber)" }}>
-          ε
+          required agreement
         </b>{" "}
-        = how much disagreement we allow before a human reviews ·{" "}
-        <span style={{ color: "var(--acc)" }}>auto-routes when δ &lt; ε</span>, otherwise it escalates to
-        a person.
+        = the bar the jury must clear ·{" "}
+        <span style={{ color: "var(--acc)" }}>auto-routes when W ≥ the bar</span> (with a clear top pick),
+        otherwise it escalates to a person.
       </div>
 
       {loadError && (
@@ -210,7 +211,7 @@ export function OpportunityBoard(p: Props) {
           <OpportunityCard
             key={opp.jobId}
             opp={opp}
-            epsilon={p.epsilon}
+            minAgreement={p.minAgreement}
             routing={p.routingJobId === opp.jobId}
             sent={p.sentJobIds.has(opp.jobId)}
             onDrillIn={p.onDrillIn}
@@ -231,20 +232,20 @@ export function OpportunityBoard(p: Props) {
 
 interface CardProps {
   opp: BoardOpportunity;
-  epsilon: number;
+  minAgreement: number;
   routing: boolean;
   sent: boolean;
   onDrillIn: (opp: BoardOpportunity) => void;
   onSend: (opp: BoardOpportunity) => void;
 }
 
-function OpportunityCard({ opp, epsilon, routing, sent, onDrillIn, onSend }: CardProps) {
-  const decision = decisionFor(opp, epsilon);
+function OpportunityCard({ opp, minAgreement, routing, sent, onDrillIn, onSend }: CardProps) {
+  const decision = decisionFor(opp, minAgreement);
   const declined = decision === "declined";
 
-  // δ on a 0–1 scale → meter fill width; ε marker rides the same axis.
-  const fillPct = opp.delta == null ? 0 : Math.max(0, Math.min(1, opp.delta)) * 100;
-  const markPct = Math.max(0, Math.min(1, epsilon)) * 100;
+  // Jury agreement W on a 0–1 scale → meter fill; the required-agreement marker rides the same axis.
+  const fillPct = opp.agreement == null ? 0 : Math.max(0, Math.min(1, opp.agreement)) * 100;
+  const markPct = Math.max(0, Math.min(1, minAgreement)) * 100;
 
   const badge = sent
     ? { cls: "sent", text: "sent ✓" }
@@ -291,9 +292,9 @@ function OpportunityCard({ opp, epsilon, routing, sent, onDrillIn, onSend }: Car
 
       <div className="opp-foot">
         <div className="partner">{opp.partner ?? "—"}</div>
-        {opp.delta != null && (
+        {opp.agreement != null && (
           <div className="delta mono">
-            δ <b>{opp.delta.toFixed(2)}</b>
+            W <b>{opp.agreement.toFixed(2)}</b>
           </div>
         )}
       </div>

@@ -53,13 +53,13 @@ function runReducer(state: RunState, action: RunAction): RunState {
 // Consume a real NDJSON stream from POST /api/run for a seeded or composed job.
 async function* streamFromApi(
   target: RouteTarget,
-  epsilon: number,
+  minAgreement: number,
   signal: AbortSignal,
 ): AsyncGenerator<RunEvent> {
   const res = await fetch("/api/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...target, epsilon }),
+    body: JSON.stringify({ ...target, minAgreement }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error(`run endpoint unavailable (${res.status})`);
@@ -83,7 +83,7 @@ async function* streamFromApi(
 
 export default function Relay() {
   const [state, dispatch] = useReducer(runReducer, undefined, () => emptyRun("idle"));
-  const [epsilon, setEpsilon] = useState(0.15);
+  const [minAgreement, setMinAgreement] = useState(0.6);
 
   const [jobs, setJobs] = useState<SeededJob[]>([]);
   const [brands, setBrands] = useState<BrandOpt[]>([]);
@@ -92,7 +92,7 @@ export default function Relay() {
   const [routingJobId, setRoutingJobId] = useState<string | null>(null);
   // jobIds the human gate has sent — flips the card badge to "sent ✓".
   const [sentJobIds, setSentJobIds] = useState<Set<string>>(() => new Set());
-  // Live throughput from the feed (revealed cards under the current ε), drives KpiRow.
+  // Live throughput from the feed (revealed cards under the current threshold), drives KpiRow.
   const [boardStats, setBoardStats] = useState<BoardStats>({ detected: 0, auto: 0, escalated: 0 });
   // The delivery seam from POST /api/action — surfaced in the outcome banner.
   const [delivery, setDelivery] = useState<Delivery | null>(null);
@@ -148,7 +148,7 @@ export default function Relay() {
     }
   }, [state.phase, state.decision]);
 
-  const execute = useCallback(async (target: RouteTarget, eps: number) => {
+  const execute = useCallback(async (target: RouteTarget, minAgreement: number) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -159,7 +159,7 @@ export default function Relay() {
     dispatch({ kind: "reset", phase: "running" });
 
     try {
-      for await (const event of streamFromApi(target, eps, controller.signal)) {
+      for await (const event of streamFromApi(target, minAgreement, controller.signal)) {
         if (controller.signal.aborted || runIdRef.current !== myRun) return;
         dispatch({ kind: "event", event });
       }
@@ -175,7 +175,7 @@ export default function Relay() {
     }
   }, []);
 
-  const handleEpsilon = useCallback((value: number) => setEpsilon(value), []);
+  const handleMinAgreement = useCallback((value: number) => setMinAgreement(value), []);
 
   // Route a decided card live through the committee. Drill-in (review) and an
   // auto-route "send →" both land here — the difference is only what the operator
@@ -184,17 +184,17 @@ export default function Relay() {
     (opp: BoardOpportunity) => {
       setRoutingJobId(opp.jobId);
       routedOppRef.current = opp;
-      void execute({ brandId: opp.brandId, techNotes: opp.techNotes, summary: opp.summary }, epsilon);
+      void execute({ brandId: opp.brandId, techNotes: opp.techNotes, summary: opp.summary }, minAgreement);
     },
-    [execute, epsilon],
+    [execute, minAgreement],
   );
 
   const composeBoard = useCallback(
     (brandId: string, techNotes: string) => {
       routedOppRef.current = null;
-      void execute({ brandId, techNotes }, epsilon);
+      void execute({ brandId, techNotes }, minAgreement);
     },
-    [execute, epsilon],
+    [execute, minAgreement],
   );
 
   const handleAction = useCallback(
@@ -253,7 +253,7 @@ export default function Relay() {
     state.stages.committee !== "queued" || state.candidates.length > 0;
 
   // avg time-to-route stays measured from the real live runs; the detected /
-  // auto / escalated counts come from the live feed under the current ε.
+  // auto / escalated counts come from the live feed under the current threshold.
   const routedDurations = routedRuns.filter((r) => r.decision !== "declined").map((r) => r.ms);
   const avgSeconds = routedDurations.length
     ? routedDurations.reduce((a, b) => a + b, 0) / routedDurations.length / 1000
@@ -261,7 +261,7 @@ export default function Relay() {
 
   const subtitle = (
     <>
-      cross-trade referral router · CRPC committee under <span className="mono">δ&lt;ε</span>
+      cross-trade referral router · a jury of judges gated on <span className="mono">Kendall&rsquo;s W</span>
     </>
   );
 
@@ -312,11 +312,11 @@ export default function Relay() {
           <div className="grid">
             <OpportunityBoard
               brands={brands}
-              epsilon={epsilon}
+              minAgreement={minAgreement}
               running={running}
               routingJobId={routingJobId}
               sentJobIds={sentJobIds}
-              onEpsilon={handleEpsilon}
+              onMinAgreement={handleMinAgreement}
               onDrillIn={routeBoardOpportunity}
               onSend={routeBoardOpportunity}
               onCompose={composeBoard}

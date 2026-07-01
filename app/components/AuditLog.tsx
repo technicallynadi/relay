@@ -10,7 +10,7 @@ interface Props {
 }
 
 // The final referral-record summary — a secondary, collapsible panel. Mirrors the
-// `referrals` audit row: scenario, decision, δ_max/ε, consensus or split, human
+// `referrals` audit row: scenario, decision, concordance W / margin, consensus or split, human
 // action, outcome.
 export function AuditLog({ state }: Props) {
   const [open, setOpen] = useState(false);
@@ -65,19 +65,23 @@ export function AuditLog({ state }: Props) {
               />
               <Cell k="Decision" v={badge.text} />
               <Cell
-                k="δ_max"
-                v={committee ? committee.deltaMax.toFixed(3) : "n/a"}
-                mono
-              />
-              <Cell k="ε threshold" v={committee ? committee.epsilon.toFixed(2) : "n/a"} mono />
-              <Cell
-                k="δ_mean"
-                v={committee ? committee.deltaMean.toFixed(3) : "n/a"}
+                k="Concordance W"
+                v={committee ? committee.concordance.toFixed(3) : "n/a"}
                 mono
               />
               <Cell
-                k="Noise floor"
-                v={committee ? committee.noiseFloor.toFixed(3) : "n/a"}
+                k="Required agr."
+                v={committee ? committee.minAgreement.toFixed(2) : "n/a"}
+                mono
+              />
+              <Cell
+                k="Avg agreement ρ̄"
+                v={committee ? committee.avgPairwiseAgreement.toFixed(3) : "n/a"}
+                mono
+              />
+              <Cell
+                k="Top-1 margin"
+                v={committee ? committee.topMargin.toFixed(3) : "n/a"}
                 mono
               />
               <Cell k="Judges" v={committee ? String(committee.reads.length) : "0"} mono />

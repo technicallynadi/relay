@@ -4,9 +4,9 @@ import type { Candidate, CommitteeResult, JudgeRead } from "@/lib/types";
 import type { RunState } from "./runState";
 import { IconCheck, IconAlert, IconGem } from "./icons";
 
-// δ and ε both live in [0,1]; render the meter across the full range so the bar and the
-// ε marker line up with the ε slider (0.01–1.0) and a strong split (δ≈0.74) still fits.
-// The verdict uses the true δ_max < ε comparison, not the display scale.
+// Concordance (Kendall's W) and the required-agreement threshold both live in [0,1];
+// render the meter across the full range so the fill and the threshold marker line up
+// with the slider. Auto-route when W ≥ the threshold (and there's a clear top pick).
 const DISPLAY_MAX = 1.0;
 const pct = (v: number) => `${Math.max(0, Math.min(1, v / DISPLAY_MAX)) * 100}%`;
 
@@ -52,13 +52,13 @@ export function CommitteePanel({ state, judgeCount }: Props) {
         : 0;
 
   return (
-    <section className="panel span-2" aria-label="CRPC committee">
+    <section className="panel span-2" aria-label="Jury">
       <div className="panel-head">
         <h2>
-          CRPC committee <span style={{ color: "var(--purple)" }}>★</span>
+          Jury <span style={{ color: "var(--purple)" }}>★</span>
         </h2>
         <span className="hint">
-          Diverse judges score independently → pairwise δ → δ&lt;ε gate
+          Diverse judges rank independently → Kendall&rsquo;s W agreement gate
         </span>
       </div>
       <div className="panel-body">
@@ -158,10 +158,11 @@ function ConvergenceMeter({
   nameById: Map<string, string>;
   candidates: Candidate[];
 }) {
-  // Pre-verdict: show the ε marker + a pending track. Post-verdict: fill to δ_max.
-  const epsilon = committee?.epsilon ?? null;
-  const deltaMax = committee?.deltaMax ?? null;
-  const noiseFloor = committee?.noiseFloor ?? 0.02;
+  // Fill to the jury's concordance W; the marker sits at the required-agreement threshold.
+  // Auto-route when the fill reaches the marker (W ≥ threshold) and the top pick is clear.
+  const concordance = committee?.concordance ?? null;
+  const minAgreement = committee?.minAgreement ?? null;
+  const rho = committee?.avgPairwiseAgreement ?? null;
   const converged = committee?.converged ?? null;
 
   const fillClass =
@@ -178,40 +179,40 @@ function ConvergenceMeter({
   return (
     <div className="meter-wrap">
       <div className="meter-head">
-        <span className="lab">Do the judges agree enough to auto-route?</span>
+        <span className="lab">Does the jury agree enough to auto-route?</span>
         <span className="meter-nums">
-          {deltaMax != null ? (
+          {concordance != null ? (
             <>
-              <span className="d">δ={deltaMax.toFixed(2)}</span>
+              <span className="d">W={concordance.toFixed(2)}</span>
               <span className="sep">·</span>
-              <span className="e">ε={epsilon?.toFixed(2)}</span>
+              <span className="e">need {minAgreement?.toFixed(2)}</span>
             </>
           ) : (
-            <span style={{ color: "var(--faint)" }}>δ pending</span>
+            <span style={{ color: "var(--faint)" }}>W pending</span>
           )}
         </span>
       </div>
 
-      <div className="meter-track" role="img" aria-label={meterAria(deltaMax, epsilon, converged)}>
-        {/* within-judge noise floor — δ below this is just sampling jitter */}
-        <div className="meter-noise" style={{ width: pct(noiseFloor) }} title="noise floor" />
-        {/* δ fill */}
+      <div className="meter-track" role="img" aria-label={meterAria(concordance, minAgreement, converged)}>
+        {/* jury concordance (Kendall's W) fill */}
         <div
           className={`meter-fill ${fillClass}`}
-          style={{ width: deltaMax != null ? pct(deltaMax) : "0%" }}
+          style={{ width: concordance != null ? pct(concordance) : "0%" }}
         />
-        {/* ε threshold marker */}
-        {epsilon != null && <div className="meter-marker" style={{ left: pct(epsilon) }} />}
+        {/* required-agreement threshold marker */}
+        {minAgreement != null && <div className="meter-marker" style={{ left: pct(minAgreement) }} />}
       </div>
       <div className="meter-scale mono">
-        <span>0.0 · agree</span>
-        <span>more disagreement →</span>
-        <span>{DISPLAY_MAX.toFixed(1)} · opposed</span>
+        <span>0.0 · no agreement</span>
+        <span>more agreement →</span>
+        <span>{DISPLAY_MAX.toFixed(1)} · unanimous</span>
       </div>
       <p style={{ margin: "10px 0 0", fontSize: 12.5, lineHeight: 1.55, color: "var(--muted)" }}>
-        <b className="mono" style={{ color: "var(--text)" }}>δ</b> is how much the judges disagree on the ranking;{" "}
-        <b className="mono" style={{ color: "var(--text)" }}>ε</b> is how much disagreement we&rsquo;ll tolerate before
-        asking a person. δ under ε → trust it and auto-route; δ over ε → escalate to a human.
+        <b className="mono" style={{ color: "var(--text)" }}>W</b> (Kendall&rsquo;s coefficient of concordance) is how
+        much the jury agrees on the ranking, 0–1
+        {rho != null ? ` — here ρ̄ = ${rho.toFixed(2)} average agreement between judge pairs` : ""}. The{" "}
+        <b className="mono" style={{ color: "var(--text)" }}>required agreement</b> is the bar the jury must clear:
+        W above it (with a clear top pick) → auto-route; below → escalate to a human.
       </p>
 
       {converged != null && (
@@ -219,7 +220,7 @@ function ConvergenceMeter({
           {converged ? <IconCheck size={16} /> : <IconAlert size={16} />}
           {converged ? (
             <span>
-              Converged → auto-route eligible
+              Jury agrees → auto-route eligible
               {consensusName ? (
                 <>
                   {" "}
@@ -228,7 +229,7 @@ function ConvergenceMeter({
               ) : null}
             </span>
           ) : (
-            <span>Diverged → escalate to human</span>
+            <span>Jury split → escalate to human</span>
           )}
         </div>
       )}
@@ -254,11 +255,11 @@ function ConvergenceMeter({
 }
 
 function meterAria(
-  deltaMax: number | null,
-  epsilon: number | null,
+  concordance: number | null,
+  minAgreement: number | null,
   converged: boolean | null,
 ): string {
-  if (deltaMax == null || epsilon == null) return "Convergence meter, awaiting judge reveals";
-  const verdict = converged ? "converged, auto-route eligible" : "diverged, escalate to human";
-  return `Delta max ${deltaMax.toFixed(2)}, epsilon ${epsilon.toFixed(2)}: ${verdict}`;
+  if (concordance == null || minAgreement == null) return "Agreement meter, awaiting judge reveals";
+  const verdict = converged ? "jury agrees, auto-route eligible" : "jury split, escalate to human";
+  return `Concordance W ${concordance.toFixed(2)}, required ${minAgreement.toFixed(2)}: ${verdict}`;
 }

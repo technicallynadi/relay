@@ -110,13 +110,13 @@ export type Decision = "auto_route_eligible" | "escalated" | "declined";
 export interface CommitteeResult {
   candidateOrder: string[]; // candidateIds defining the preference-vector index order
   reads: JudgeRead[];
-  deltaMatrix: number[][]; // pairwise δ between judges (cosine distance of preferences)
-  deltaMax: number;
-  deltaMean: number;
-  epsilon: number;
-  noiseFloor: number; // within-judge sampling jitter; δ is judged against this, not 0
-  converged: boolean; // deltaMax < epsilon
-  consensusPartnerId: string | null;
+  concordance: number; // Kendall's W ∈ [0,1] — how much the jury agrees on the ranking
+  avgPairwiseAgreement: number; // ρ̄ = (mW−1)/(m−1) — mean pairwise judge agreement
+  minAgreement: number; // required concordance to auto-route (the live threshold)
+  topMargin: number; // Borda winner's normalized lead over the runner-up ∈ [0,1]
+  marginFloor: number; // the top-1 margin guard the winner must clear
+  converged: boolean; // concordance ≥ minAgreement AND topMargin ≥ marginFloor
+  consensusPartnerId: string | null; // Borda consensus winner (null when escalated)
   decision: Decision; // auto_route_eligible | escalated
   split?: { partnerAId: string; partnerBId: string; note: string };
 }

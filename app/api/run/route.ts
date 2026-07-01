@@ -8,11 +8,11 @@ export const dynamic = "force-dynamic";
 // { scenarioKey } or a composed { brandId, techNotes } job.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
-  const epsilon = typeof body.epsilon === "number" ? body.epsilon : undefined;
+  const minAgreement = typeof body.minAgreement === "number" ? body.minAgreement : undefined;
   const gen =
     typeof body.brandId === "string" && typeof body.techNotes === "string"
-      ? runPipelineForJob(buildCustomJob(body.brandId, body.techNotes, typeof body.summary === "string" ? body.summary : undefined), { epsilon })
-      : runPipeline(typeof body.scenarioKey === "string" ? body.scenarioKey : "drain-job", { epsilon });
+      ? runPipelineForJob(buildCustomJob(body.brandId, body.techNotes, typeof body.summary === "string" ? body.summary : undefined), { minAgreement })
+      : runPipeline(typeof body.scenarioKey === "string" ? body.scenarioKey : "drain-job", { minAgreement });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
