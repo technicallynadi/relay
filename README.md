@@ -115,6 +115,8 @@ The five judges run across **different model families** because the diversity is
 
 Five lenses, deliberately spanning **four model families** so their agreement means something:
 
+![The five judges — dot-matrix persona avatars, one per model family](docs/assets/judges.svg)
+
 | Judge | The lens it argues from | Model | Family |
 |---|---|---|---|
 | **The Matchmaker** | the best technical fit for the job, even out-of-network | `gpt-4o-mini` | OpenAI |
@@ -157,8 +159,6 @@ TypeScript · Bun · Next.js (App Router) · PGlite (embedded Postgres + pgvecto
 
 Prototype, runs locally. Real retrieval (PGlite + pgvector), a real jury, real job-close signals; referral delivery and outcomes are simulated behind adapter seams (Twilio/Resend for Send, Google Places for partner sourcing). Auth and deployment are roadmap, not in this build.
 
-## Docs & prior art
-
-- `docs/research/2026-06-29-judge-panel-design-research.md` — the evidence base for the jury design: why a diverse panel, and why Kendall's *W*.
+## Method & prior art
 
 The jury is a **Panel of LLM judges (PoLL)** in the sense of Verga et al. 2024 — diverse models, disjoint families, aggregated. Agreement is quantified with **Kendall's coefficient of concordance *W*** (Kendall & Babington Smith, 1939). Judge personalities are **OCEAN / Big Five** weight vectors used only to initialize deterministic criteria weights, never as a role-play prompt. The consensus winner is chosen by **Borda count**; **Kemeny–Young** (the Condorcet-consistent exact aggregator) is available as a gold-standard cross-check.

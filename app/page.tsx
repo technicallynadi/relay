@@ -30,8 +30,6 @@ import { LocationsPanel } from "./components/LocationsPanel";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 
-const EXPECTED_JUDGES = 5;
-
 type RunAction =
   | { kind: "reset"; phase: RunState["phase"] }
   | { kind: "event"; event: RunEvent }
@@ -408,7 +406,7 @@ export default function Relay() {
 
             {reachedCommitteePhase && (
               <>
-                <CommitteePanel state={state} judgeCount={EXPECTED_JUDGES} />
+                <CommitteePanel state={state} />
                 <div className="grid grid-main span-2">
                   <CandidateSheets state={state} />
                   <HumanGate state={state} onAction={handleAction} delivery={delivery} />

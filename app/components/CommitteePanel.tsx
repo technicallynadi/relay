@@ -3,6 +3,8 @@
 import type { Candidate, CommitteeResult, JudgeRead } from "@/lib/types";
 import type { RunState } from "./runState";
 import { IconCheck, IconAlert, IconGem } from "./icons";
+import { JudgeAvatar } from "./JudgeAvatar";
+import { JUDGE_ROSTER, type JudgePersona } from "./judgePersonas";
 
 // Concordance (Kendall's W) and the required-agreement threshold both live in [0,1];
 // render the meter across the full range so the fill and the threshold marker line up
@@ -22,10 +24,9 @@ const JUDGE_LENS: Record<string, string> = {
 
 interface Props {
   state: RunState;
-  judgeCount: number; // how many reads to expect (for skeletons)
 }
 
-export function CommitteePanel({ state, judgeCount }: Props) {
+export function CommitteePanel({ state }: Props) {
   const committeeStarted = state.stages.committee !== "queued" && state.stages.committee !== "skipped";
   const { reads, committee, candidates } = state;
 
@@ -37,19 +38,9 @@ export function CommitteePanel({ state, judgeCount }: Props) {
   const split = committee?.split;
   const consensusId = committee?.consensusPartnerId ?? null;
 
-  // Sort reads by judge name for stable card order as they stream in.
-  const ordered = [...reads].sort((a, b) => a.judgeName.localeCompare(b.judgeName));
-  // Show "incoming reveal" skeletons only while the committee is still resolving
-  // (no result yet). `judgeCount` is just a hint for the *initial* placeholder
-  // count — once reads outrun it (the backend may ship more judges than expected)
-  // we keep one trailing slot so the panel reads as live, not stalled.
-  const pending = committee
-    ? 0
-    : ordered.length < judgeCount
-      ? judgeCount - ordered.length
-      : state.stages.committee === "live"
-        ? 1
-        : 0;
+  // Render all five judges in a stable order: each shows a "thinking" avatar until its
+  // read lands, then settles into its card — so you watch the jury deliberate live.
+  const readById = new Map<string, JudgeRead>(reads.map((r) => [r.judgeId, r]));
 
   return (
     <section className="panel span-2" aria-label="Jury">
@@ -75,23 +66,25 @@ export function CommitteePanel({ state, judgeCount }: Props) {
         ) : (
           <>
             <div className="judges">
-              {ordered.map((r) => (
-                <JudgeCard
-                  key={r.judgeId}
-                  read={r}
-                  pickedName={nameById.get(r.topCandidateId) ?? r.topCandidateId}
-                  isDisputed={
-                    !!split &&
-                    (r.topCandidateId === split.partnerAId ||
-                      r.topCandidateId === split.partnerBId) &&
-                    !committee?.converged
-                  }
-                  isAligned={!!committee?.converged && r.topCandidateId === consensusId}
-                />
-              ))}
-              {Array.from({ length: pending }).map((_, i) => (
-                <JudgeSkeleton key={`sk-${i}`} />
-              ))}
+              {JUDGE_ROSTER.map((persona) => {
+                const read = readById.get(persona.id);
+                if (!read) return <JudgeThinking key={persona.id} persona={persona} />;
+                return (
+                  <JudgeCard
+                    key={persona.id}
+                    persona={persona}
+                    read={read}
+                    pickedName={nameById.get(read.topCandidateId) ?? read.topCandidateId}
+                    isDisputed={
+                      !!split &&
+                      (read.topCandidateId === split.partnerAId ||
+                        read.topCandidateId === split.partnerBId) &&
+                      !committee?.converged
+                    }
+                    isAligned={!!committee?.converged && read.topCandidateId === consensusId}
+                  />
+                );
+              })}
             </div>
 
             <ConvergenceMeter committee={committee} nameById={nameById} candidates={candidates} />
@@ -103,11 +96,13 @@ export function CommitteePanel({ state, judgeCount }: Props) {
 }
 
 function JudgeCard({
+  persona,
   read,
   pickedName,
   isDisputed,
   isAligned,
 }: {
+  persona: JudgePersona;
   read: JudgeRead;
   pickedName: string;
   isDisputed: boolean;
@@ -116,8 +111,9 @@ function JudgeCard({
   const lens = JUDGE_LENS[read.judgeName] ?? "a distinct evaluation lens";
   const cls = isDisputed ? "disputed" : isAligned ? "consensus-aligned" : "";
   return (
-    <article className={`judge-card ${cls}`}>
+    <article className={`judge-card settle ${cls}`}>
       <div className="judge-top">
+        <JudgeAvatar persona={persona} size={44} />
         <span className="judge-name">{read.judgeName}</span>
       </div>
       <span className="judge-lens">{lens}</span>
@@ -138,14 +134,25 @@ function JudgeCard({
   );
 }
 
-function JudgeSkeleton() {
+function JudgeThinking({ persona }: { persona: JudgePersona }) {
   return (
-    <div className="judge-skeleton" aria-hidden="true">
-      <div className="sk-line" style={{ width: "55%" }} />
-      <div className="sk-line" style={{ width: "80%" }} />
-      <div className="sk-line" style={{ width: "40%", height: 14 }} />
-      <div className="sk-line" style={{ width: "70%" }} />
-    </div>
+    <article className="judge-card thinking-card">
+      <div className="judge-top">
+        <JudgeAvatar persona={persona} thinking size={44} />
+        <span className="judge-name">{persona.name}</span>
+      </div>
+      <div className="chip-row">
+        <span className="chip family">{persona.family}</span>
+      </div>
+      <div className="thinking-line">
+        <span className="thinking-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        reading the evidence…
+      </div>
+    </article>
   );
 }
 
