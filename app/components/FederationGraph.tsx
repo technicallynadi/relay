@@ -30,7 +30,7 @@ const ROW_H = 62;
 const pY = (i: number) => 68 + i * ROW_H; // leaves a clear band for the column header above card 0
 
 // Geography scatter box (lower-left; revealed during a run).
-const GEO = { x: 40, y: 300, w: 372, h: 116, pad: 16 };
+const GEO = { x: 40, y: 344, w: 372, h: 116, pad: 16 };
 
 const cap = (t: string) => t.replace(/_/g, " ");
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -180,7 +180,7 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
       </div>
       <div className="panel-body">
         <svg
-          viewBox="0 0 920 462"
+          viewBox="0 0 920 508"
           width="100%"
           role="img"
           aria-label="Federated graph: trades linked by weighted, directed cross-trade adjacency edges, plus a geography scatter of the job and retrieved local partners."
@@ -579,7 +579,7 @@ export function FederationGraph({ state, brands, adjacency }: Props) {
           )}
 
           {/* hover / route caption spanning the width */}
-          <text x={16} y={452} fontSize="10.5" style={{ pointerEvents: "none" }}>
+          <text x={16} y={494} fontSize="10.5" style={{ pointerEvents: "none" }}>
             {caption ?? partnerCaptionRow("hover an edge or a trade to inspect the cross-trade signal")}
           </text>
         </svg>
