@@ -37,3 +37,6 @@ coverage/
 
 # personal / interview notes — never share
 *.private.md
+
+# internal design spec — kept locally, not shared in the repo
+docs/specs/
