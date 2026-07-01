@@ -17,6 +17,11 @@ export async function GET() {
       location: j.location.label,
     })),
     brands: BRANDS.map((b) => ({ id: b.id, name: b.name, trade: b.trade })),
-    adjacency: ADJACENCY.map((e) => ({ fromTrade: e.fromTrade, toTrade: e.toTrade, weight: e.weight })),
+    adjacency: ADJACENCY.map((e) => ({
+      fromTrade: e.fromTrade,
+      toTrade: e.toTrade,
+      weight: e.weight,
+      rationale: e.rationale,
+    })),
   });
 }
