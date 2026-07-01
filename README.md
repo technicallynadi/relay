@@ -113,15 +113,15 @@ The five judges run across **different model families** because the diversity is
 
 ### The judges
 
-Five lenses, deliberately spanning **four model families** so their agreement means something:
+Five lenses, deliberately spanning **different model families** so their agreement means something (the models are set in `relay.config.yaml`):
 
-| Judge | The lens it argues from | Family |
-|---|---|---|
-| **The Matchmaker** | the best technical fit for the job, even out-of-network | OpenAI |
-| **The Operator** | can the partner *actually deliver*? — capacity & reliability | Anthropic |
-| **The Closer** | the odds the referral converts to a booked job | Meta |
-| **The Concierge** | protecting the customer's experience & the relationship | Anthropic |
-| **The Steward** | defending in-network brand standards & low-risk choices | Google |
+| Judge | The lens it argues from |
+|---|---|
+| **The Matchmaker** | the best technical fit for the job, even out-of-network |
+| **The Operator** | can the partner *actually deliver*? — capacity & reliability |
+| **The Closer** | the odds the referral converts to a booked job |
+| **The Concierge** | protecting the customer's experience & the relationship |
+| **The Steward** | defending in-network brand standards & low-risk choices |
 
 Each lens is an OCEAN / Big-Five prior that derives that judge's criteria weights in code — never role-played in the prompt. Each judge's specific model is shown live on its card and set in `relay.config.yaml` (swap any of them there and reload); with no key every judge falls back to its deterministic weights. Their built-in tension is the point: the Matchmaker's "best fit" pulls out-of-network while the Steward defends in-network, and the Closer's "will it convert" trades off against the Operator's "can they deliver" — so when they *do* concur, that agreement is real signal.
 
