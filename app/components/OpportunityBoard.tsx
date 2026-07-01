@@ -5,9 +5,9 @@ import { DotGrid } from "./DotGrid";
 import { IconPen, IconScan, IconTune } from "./icons";
 import type { BrandOpt } from "./JobConsole";
 
-// A decided opportunity row from GET /api/board. The server's decision is advisory —
-// the board re-decides every card live against the operator's required-agreement dial
-// (see `decisionFor`), so dragging it re-routes the whole grid.
+// A decided opportunity row from the live feed (GET /api/incoming). The server's decision
+// is advisory — the board re-decides every card live against the operator's required-agreement
+// dial (see `decisionFor`), so dragging it re-routes the whole grid.
 export interface BoardOpportunity {
   jobId: string;
   brandId: string;
@@ -48,7 +48,7 @@ interface Props {
   registerComposeOpener?: (open: () => void) => void;
 }
 
-const REVEAL_INTERVAL_MS = 2400;
+const POLL_INTERVAL_MS = 2000; // how often the board pulls the live feed
 const MARGIN_FLOOR = 0.15; // the Borda winner must clear the runner-up by this much
 
 // The board's single source of truth for a card's decision: declined when there's no
@@ -72,101 +72,91 @@ function tradeLabel(trade: string | null): string {
 
 export function OpportunityBoard(p: Props) {
   const [all, setAll] = useState<BoardOpportunity[]>([]);
-  const [revealed, setRevealed] = useState(0);
   const [paused, setPaused] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [everLoaded, setEverLoaded] = useState(false);
 
-  // Load the decided board once on mount.
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/board")
+  // Pull the live feed. The ingestion worker POSTs freshly-pulled jobs to /api/incoming;
+  // we render the whole feed (newest first) and it grows as jobs stream in.
+  const load = useCallback(() => {
+    fetch("/api/incoming")
       .then((r) => r.json())
       .then((d: { opportunities?: BoardOpportunity[] }) => {
-        if (!alive) return;
         setAll(d.opportunities ?? []);
-        // Reveal the first card immediately so the feed never opens empty.
-        setRevealed(d.opportunities?.length ? 1 : 0);
+        setEverLoaded(true);
+        setLoadError(false);
       })
-      .catch(() => {
-        if (alive) setLoadError(true);
-      });
-    return () => {
-      alive = false;
-    };
+      .catch(() => setLoadError(true));
   }, []);
 
-  const total = all.length;
-  const caughtUp = total > 0 && revealed >= total;
-
-  // The live feed tick: reveal one more card every interval until caught up.
+  // Poll on an interval while live; stop hitting the endpoint when paused.
   useEffect(() => {
-    if (paused || caughtUp || total === 0) return;
-    const id = window.setInterval(() => {
-      setRevealed((n) => (n >= total ? n : n + 1));
-    }, REVEAL_INTERVAL_MS);
+    if (paused) return;
+    load();
+    const id = window.setInterval(load, POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [paused, caughtUp, total]);
+  }, [paused, load]);
 
-  const visible = useMemo(() => all.slice(0, revealed), [all, revealed]);
+  const total = all.length;
 
-  // Report live stats up whenever the revealed set or the required-agreement dial changes
-  // — computed from the REVEALED cards under the live decision, so the KPI row tracks it.
+  // Report live stats up whenever the feed or the required-agreement dial changes — computed
+  // over the whole live feed under the current decision, so the KPI row tracks it.
   const stats = useMemo<BoardStats>(() => {
     let auto = 0;
     let escalated = 0;
-    for (const opp of visible) {
+    for (const opp of all) {
       const d = decisionFor(opp, p.minAgreement);
       if (d === "auto") auto++;
       else if (d === "escalated") escalated++;
     }
-    return { detected: visible.length, auto, escalated };
-  }, [visible, p.minAgreement]);
+    return { detected: all.length, auto, escalated };
+  }, [all, p.minAgreement]);
 
   const onStats = p.onStats;
   useEffect(() => {
     onStats(stats);
   }, [stats, onStats]);
 
-  const restart = useCallback(() => {
-    setRevealed(total > 0 ? 1 : 0);
+  // Restart: wipe the feed on the server (it re-seeds the demo baseline) and stay live, so
+  // the board repopulates and keeps filling.
+  const restart = useCallback(async () => {
+    await fetch("/api/incoming", { method: "DELETE" }).catch(() => {});
+    setAll([]);
     setPaused(false);
-  }, [total]);
+    load();
+  }, [load]);
 
-  const clearFeed = useCallback(() => {
-    setRevealed(0);
+  // Clear: empty the feed and hold it. The server re-seeds the baseline on the next pull
+  // (when you press start again).
+  const clearFeed = useCallback(async () => {
+    await fetch("/api/incoming", { method: "DELETE" }).catch(() => {});
+    setAll([]);
     setPaused(true);
   }, []);
 
-  const feedLabel =
-    revealed === 0 ? "cleared" : caughtUp ? "feed caught up" : paused ? "paused" : "jobs arriving…";
+  const feedLabel = paused
+    ? "paused"
+    : total === 0
+      ? everLoaded
+        ? "cleared"
+        : "connecting…"
+      : "jobs arriving…";
 
   return (
     <section aria-label="Live opportunity feed">
       {/* ---- Feed control row + required-agreement dial ---- */}
       <div className="seclab">
         <div className="feed-ctl">
-          <span className={`feed-pulse${paused || caughtUp ? " off" : ""}`} aria-hidden="true" />
+          <span className={`feed-pulse${paused ? " off" : ""}`} aria-hidden="true" />
           <span className="feed-state">{feedLabel}</span>
-          <span className="feed-count mono">
-            {revealed}/{total}
-          </span>
-          <button
-            type="button"
-            className="feed-btn"
-            onClick={() => setPaused((v) => !v)}
-            disabled={caughtUp}
-          >
+          <span className="feed-count mono">{total}</span>
+          <button type="button" className="feed-btn" onClick={() => setPaused((v) => !v)}>
             {paused ? "▶ start" : "⏸ stop"}
           </button>
           <button type="button" className="feed-btn" onClick={restart}>
             ↻ restart
           </button>
-          <button
-            type="button"
-            className="feed-btn"
-            onClick={clearFeed}
-            disabled={revealed === 0}
-          >
+          <button type="button" className="feed-btn" onClick={clearFeed} disabled={total === 0}>
             ✕ clear
           </button>
         </div>
@@ -207,7 +197,7 @@ export function OpportunityBoard(p: Props) {
       )}
 
       <div className="opp-grid">
-        {visible.map((opp) => (
+        {all.map((opp) => (
           <OpportunityCard
             key={opp.jobId}
             opp={opp}

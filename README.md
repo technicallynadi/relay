@@ -50,7 +50,7 @@ Judge diversity is *real*, not cosmetic: each judge is an explicit **criteria-we
 
 ## Status
 
-Prototype. Runs locally for a live walkthrough. Real retrieval (PGlite + pgvector), a real jury, scripted job-close scenarios; referral delivery and outcomes are simulated. Live Google Places, auth, and deployment are roadmap, not in this build.
+Prototype. Runs locally for a live walkthrough. Real retrieval (PGlite + pgvector), a real jury, scripted job-close scenarios; referral delivery and outcomes are simulated. An optional ingestion worker streams synthesized job-closes on a cron to drive the live activation feed. Live Google Places, auth, and deployment are roadmap, not in this build.
 
 ## Stack
 
@@ -74,6 +74,16 @@ Pick a scenario and watch the pipeline run. On the **abstains** scenario, drag t
 - **OpenRouter key** → the five judges run across different model families (the evidence-backed diversity).
 - **OpenAI-only key** → judges run on one model (no family diversity); embeddings are semantic.
 - **No key** → fully deterministic: detector by graph + keywords, judges by their criteria-weights. The three-scenario arc still holds, so the demo never depends on the network.
+
+### Live feed (optional)
+
+The board opens on a seeded set of opportunities and grows on its own when you run the ingestion worker in a second shell:
+
+```bash
+./run.sh worker    # a cron pulls a completed-job signal every ~6s → POST /api/incoming
+```
+
+Each tick synthesizes a plausible job-close, routes it through the same detect → retrieve → jury pipeline, and prepends the opportunity to the live feed (newest first). Stop / restart / clear it from the board's control row; `WORKER_CRON` overrides the schedule. In production this worker is an Inngest/cron consumer of real "job closed" events from the brands' field-service systems.
 
 ### Verify (no key required)
 

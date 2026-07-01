@@ -92,7 +92,7 @@ export default function Relay() {
   const [routingJobId, setRoutingJobId] = useState<string | null>(null);
   // jobIds the human gate has sent — flips the card badge to "sent ✓".
   const [sentJobIds, setSentJobIds] = useState<Set<string>>(() => new Set());
-  // Live throughput from the feed (revealed cards under the current threshold), drives KpiRow.
+  // Live throughput from the feed (cards under the current threshold), drives KpiRow.
   const [boardStats, setBoardStats] = useState<BoardStats>({ detected: 0, auto: 0, escalated: 0 });
   // The delivery seam from POST /api/action — surfaced in the outcome banner.
   const [delivery, setDelivery] = useState<Delivery | null>(null);
