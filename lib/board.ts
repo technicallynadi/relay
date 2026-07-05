@@ -2,8 +2,8 @@
 // deterministic jury (Kendall's W). Used by /api/board, /api/incoming, and the worker.
 
 import { BRAND_BY_ID } from "@/data/brands";
-import { JUDGES } from "@/data/judges";
 import { runCommitteeDeterministic } from "@/lib/committee";
+import { effectiveJudges } from "@/lib/judges";
 import { detect } from "@/lib/pipeline";
 import { getPartners } from "@/lib/places";
 import { retrieveCandidates } from "@/lib/retrieval";
@@ -45,7 +45,7 @@ export async function decideOpportunity(job: Job, minAgreement: number): Promise
 
   const partners = await getPartners(detection.trade, job.location);
   const candidates = await retrieveCandidates(partners, job, detection.trade);
-  const result = runCommitteeDeterministic(JUDGES, candidates, minAgreement);
+  const result = runCommitteeDeterministic(effectiveJudges(), candidates, minAgreement);
   const pid =
     result.consensusPartnerId ?? result.split?.partnerAId ?? candidates[0]?.partner.id ?? null;
   const partnerName = pid ? (candidates.find((c) => c.partner.id === pid)?.partner.name ?? null) : null;
