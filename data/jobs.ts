@@ -3,7 +3,7 @@ import { extractSpecialties } from "@/lib/specialties";
 import type { Job } from "@/lib/types";
 
 // Three example completed-job events. The keys name the JOB, not the outcome — the
-// decision is computed live by the committee (δ<ε), never implied by the scenario.
+// decision is computed live by the jury gate (Kendall's W), never implied by the scenario.
 export const JOBS: Job[] = [
   {
     id: "job_drain",
